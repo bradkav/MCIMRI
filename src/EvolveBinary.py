@@ -1,7 +1,9 @@
 import numpy as np
 from numpy import cos, sin
 
-from tqdm import tqdm
+#from tqdm import tqdm
+tqdm = lambda x: x
+
 
 from scipy.interpolate import interp1d
 
@@ -18,18 +20,31 @@ import binaries
 import MCimri
 import orbits
 
+from pathlib import Path
+
 #Specify the binary system
 m1 = 4e6*u.Msun
-m2 = (10**3.5)*u.Msun
-a_over_risco = 2
+m2 = (10**3.0)*u.Msun
+a_over_risco = 16.67
 
 binaryC = binaries.CircularBinary(m1, m2)
 r_isco = binaryC.r_isco
 
 a_i = a_over_risco*r_isco
 
+#ID = tools.generate_hash()
 
-fstr = f"logM2_{np.log10(m2/u.Msun):.2f}_test"
+import sys
+
+rank = int(sys.argv[1])
+print("rank:", rank)
+
+fstr = f"logM2_{np.log10(m2/u.Msun):.2f}_NDM_2000_rM_100_" + str(int(rank))
+datapath = "../data/" + fstr + "/"
+plotpath = "../plots/" + fstr + "/"
+
+Path(datapath).mkdir(parents=True, exist_ok=True)
+Path(plotpath).mkdir(parents=True, exist_ok=True)
 
 def make_plot(N):
     
@@ -73,17 +88,17 @@ def make_plot(N):
     plt.title(r"$(m_1, m_2) = (" + m1str + ", " + m2str + ")\,M_\odot$; " + str(int(N)) + " orbits")
     plt.legend(loc='upper right')
 
-    plt.savefig(f"../plots/InspiralDepletion_{fstr}_Norb_{int(N)}.pdf", bbox_inches='tight')
+    plt.savefig(plotpath + f"InspiralDepletion_{fstr}_Norb_{int(N)}.pdf", bbox_inches='tight')
 
 def save_density(N):
     rholist_full = orbits.reconstruct_density_full(rlist, Es, Ls, weights, m1)
     hdrtxt = "Columns: r [pc], rho [Msun/pc**3], rho/rho_i"
-    np.savetxt(f"../data/Density_{fstr}_Norb_" + str(int(N)) + ".txt", np.column_stack((rlist/u.pc, rholist_full/(u.Msun/u.pc**3), rholist_full/rholist_i)), header=hdrtxt)
+    np.savetxt(datapath + f"Density_{fstr}_Norb_" + str(int(N)) + ".txt", np.column_stack((rlist/u.pc, rholist_full/(u.Msun/u.pc**3), rholist_full/rholist_i)), header=hdrtxt)
 
 def save_orbits(N):
     hdrtxt = "Columns: E [(km/s)^2], L [pc (km/s)], Lz [pc (km/s)], w [Msun]"
     outdata = np.column_stack((Es/(u.km/u.s)**2, Ls/(u.pc*u.km/u.s), Lz/(u.pc*u.km/u.s), weights/u.Msun))
-    np.savetxt(f"../data/Orbits_{fstr}_Norb_" + str(int(N)) + ".txt", outdata, header=hdrtxt)
+    np.savetxt(datapath + f"Orbits_{fstr}_Norb_" + str(int(N)) + ".txt", outdata, header=hdrtxt)
 
 
 #####################
@@ -95,7 +110,7 @@ DYNAMIC = True
 
 #Define the spike and sample the energies of N_particles particles (or rather, orbits), from P(E) = g(E)*d(E)
 #---------------------------
-N_particles = 10000
+N_particles = 2000
 SpikeDF = df.GeneralizedNFWSpike(m1, rho_6=1*u.Msun/u.pc**3, gamma_sp=7/3, r_t=20*a_i, alpha=2)
 r_max = 10000*a_i
 
@@ -123,7 +138,7 @@ print("Number of orbits to merger:", N_to_merge)
 Norb = int(1.1*N_to_merge)
 offset = 0
 
-N_out = 1_000
+N_out = 50_000
 
 Es = 1.0*Es_i
 Ls = 1.0*Ls_i
@@ -161,13 +176,11 @@ for i in tqdm(range(Norb)):
         r_orb = binaryC.r_of_t(t, a_i)
         
     if (r_orb < r_isco):
+        save_density(i+offset)
+        save_orbits(i+offset)
+        make_plot(i+offset)
         break
 
-rholist_full = orbits.reconstruct_density_full(rlist, Es, Ls, weights, m1)
-np.savetxt(f"../data/DensityRatio_{fstr}_end.txt", rholist_full/rho_ana)
-
-make_plot(i+offset)
-
-plt.show()
+#plt.show()
 #----------------
 
