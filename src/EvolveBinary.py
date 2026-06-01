@@ -118,19 +118,27 @@ DYNAMIC = True
 #Define the spike and sample the energies of N_particles particles (or rather, orbits), from P(E) = g(E)*d(E)
 #---------------------------
 SpikeDF = df.GeneralizedNFWSpike(m1, rho_6=1*u.Msun/u.pc**3, gamma_sp=7/3, r_t=20*a_i, alpha=2)
+r_min = 0.1*a_i
 r_max = 10000*a_i
 
 if (SGSK_MODE):
     ecc = 0.67
+    gamma = 7/3
     
     _u = np.random.rand(N_particles)
-    rp_min = r_isco
-    rp_max = 330*r_isco
+    #rp_min = r_isco
+    #rp_max = 330*r_isco
+    
+    rp_min = r_min
+    rp_max = r_max
     rps = rp_min*(rp_max/rp_min)**_u
 
     Es_i = np.ones(N_particles)*(u.G_N*m1)*(1-ecc)/(2*rps)
     L_circ = u.G_N*m1/np.sqrt(2*Es_i)
     Ls_i = L_circ*np.sqrt(1 - ecc**2)
+    
+    weights = rps**(-(gamma - 3))
+    
 else:
     Es_i = SpikeDF.draw_E(r_max=r_max, N = N_particles)
     L_circ = u.G_N*m1/np.sqrt(2*Es_i)
