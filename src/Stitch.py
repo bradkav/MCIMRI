@@ -21,26 +21,28 @@ import argparse
 parser = argparse.ArgumentParser()
 #parser.add_argument("-m1", type=float, default = 4e6)
 parser.add_argument("-logm2", type=float, default = 4)
-#parser.add_argument("-x", type=float, default = 20)
+parser.add_argument("-rM", type=float, default = 100)
 
 args = parser.parse_args()
 m2 = (10**args.logm2)*u.Msun
-
+rM_val = args.rM
 
 
 #Specify the binary system
 m1 = 4e6*u.Msun
 
-fstr_base = f"logM2_{np.log10(m2/u.Msun):.2f}_x_30"
+fstr_base = f"logM2_{np.log10(m2/u.Msun):.2f}_NDM_2000_rM_{str(int(rM_val))}"
+print(fstr_base)
+
 
 binaryC = binaries.CircularBinary(m1, m2)
 r_isco = binaryC.r_isco
 
-a_i = 20*r_isco
-SpikeDF = df.GeneralizedNFWSpike(m1, rho_6=1*u.Msun/u.pc**3, gamma_sp=7/3, r_t=20*a_i, alpha=2)
+a_i = rM_val*r_isco/6
+#SpikeDF = df.GeneralizedNFWSpike(m1, rho_6=1*u.Msun/u.pc**3, gamma_sp=7/3, r_t=20*a_i, alpha=2)
 
-
-for i in range(16):
+N_jobs = 16
+for i in range(N_jobs):
     fstr = f"{fstr_base}_" + str(int(i))
     datapath = "../data/" + fstr + "/"
 
@@ -57,8 +59,8 @@ for i in range(16):
         rho_full += data[:,1]*u.Msun/u.pc**3
         rho_ratio += data[:,2]
 
-rho_full /= 16
-rho_ratio /= 16
+rho_full /= N_jobs
+rho_ratio /= N_jobs
 
 hdrtxt = "Columns: r [pc], rho [Msun/pc**3], rho/rho_i"
 np.savetxt(f"../data/Density_{fstr_base}_Norb_final.txt", np.column_stack((rlist/u.pc, rho_full/(u.Msun/u.pc**3), rho_ratio)), header=hdrtxt)

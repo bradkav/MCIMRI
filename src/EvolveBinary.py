@@ -24,8 +24,15 @@ from pathlib import Path
 
 #Specify the binary system
 m1 = 4e6*u.Msun
-m2 = (10**3.0)*u.Msun
-a_over_risco = 16.67
+m2 = (10**4.0)*u.Msun
+a_over_rM    = 100
+N_particles = 2000
+dN = 1
+
+SGSK_MODE = True
+SAVE_ORBITS = False
+
+a_over_risco = a_over_rM/6
 
 binaryC = binaries.CircularBinary(m1, m2)
 r_isco = binaryC.r_isco
@@ -39,7 +46,7 @@ import sys
 rank = int(sys.argv[1])
 print("rank:", rank)
 
-fstr = f"logM2_{np.log10(m2/u.Msun):.2f}_NDM_2000_rM_100_" + str(int(rank))
+fstr = f"logM2_{np.log10(m2/u.Msun):.2f}_NDM_{str(int(N_particles))}_rM_{str(int(np.round(a_over_rM)))}_dN_{str(int(dN))}_SGSK_" + str(int(rank))
 datapath = "../data/" + fstr + "/"
 plotpath = "../plots/" + fstr + "/"
 
@@ -110,13 +117,25 @@ DYNAMIC = True
 
 #Define the spike and sample the energies of N_particles particles (or rather, orbits), from P(E) = g(E)*d(E)
 #---------------------------
-N_particles = 2000
 SpikeDF = df.GeneralizedNFWSpike(m1, rho_6=1*u.Msun/u.pc**3, gamma_sp=7/3, r_t=20*a_i, alpha=2)
 r_max = 10000*a_i
 
-Es_i = SpikeDF.draw_E(r_max=r_max, N = N_particles)
-L_circ = u.G_N*m1/np.sqrt(2*Es_i)
-Ls_i = L_circ*np.sqrt(np.random.rand(N_particles))
+if (SGSK_MODE):
+    ecc = 0.67
+    
+    _u = np.random.rand(N_particles)
+    rp_min = r_isco
+    rp_max = 330*r_isco
+    rps = rp_min*(rp_max/rp_min)**_u
+
+    Es_i = np.ones(N_particles)*(u.G_N*m1)*(1-ecc)/(2*rps)
+    L_circ = u.G_N*m1/np.sqrt(2*Es_i)
+    Ls_i = L_circ*np.sqrt(1 - ecc**2)
+else:
+    Es_i = SpikeDF.draw_E(r_max=r_max, N = N_particles)
+    L_circ = u.G_N*m1/np.sqrt(2*Es_i)
+    Ls_i = L_circ*np.sqrt(np.random.rand(N_particles))
+
 Lz_i = Ls_i*(2*np.random.rand(N_particles) - 1)
 
 m_part = SpikeDF.M_DM_ini(r_max)/N_particles
@@ -147,14 +166,12 @@ Lz = 1.0*Lz_i
 r_orb = 1.0*a_i
 t = 0
 
-dN = 1
-
 for i in tqdm(range(Norb)):
     
     if (i%N_out == 0):
         print(i, r_orb/a_i)
         save_density(i+offset)
-        save_orbits(i+offset)
+        if (SAVE_ORBITS): save_orbits(i+offset)
         make_plot(i+offset)
     
     L_circ = u.G_N*m1/np.sqrt(2*np.abs(Es))
@@ -177,7 +194,7 @@ for i in tqdm(range(Norb)):
         
     if (r_orb < r_isco):
         save_density(i+offset)
-        save_orbits(i+offset)
+        if (SAVE_ORBITS): save_orbits(i+offset)
         make_plot(i+offset)
         break
 
