@@ -13,27 +13,46 @@ from NbodyIMRI import distributionfunctions as df
 from NbodyIMRI import units as u
 from NbodyIMRI import tools
 
+from pathlib import Path
+
 import utilities
 import binaries
 import MCimri
 import orbits
 
 #Specify the binary system
-#m1 = 10.0*u.Msun
-#m2 = 0.15*u.Msun
+m1 = 10.0*u.Msun
+m2 = 0.15*u.Msun
+#m1 = 7.46*u.Msun
+#m2 = 0.18*u.Msun
+#rsun = 695700*u.km
+#a_i = 2.54*rsun
+a_i = 1e-7*u.pc
+
 
 
 #Specify the binary system
-m1 = 4e6*u.Msun
-m2 = (10**3.5)*u.Msun
-a_over_risco = 12.26
+#m1 = 4e6*u.Msun
+#m2 = (10**3.5)*u.Msun
+#a_over_risco = 12.26
 
 binaryC = binaries.CircularBinary(m1, m2)
 r_isco = binaryC.r_isco
 
-a_i = a_over_risco*r_isco
+#a_i = a_over_risco*r_isco
 
 q  = m2/m1
+
+#IDstr = "SystemA_res"
+IDstr = "M1_10_M2_0.15_doinner_Nout_50"
+#IDstr = "Test"
+datapath = "../data/" + IDstr + "/"
+plotpath = "../plots/" + IDstr + "/"
+
+MAKE_PLOTS = False
+
+Path(datapath).mkdir(parents=True, exist_ok=True)
+Path(plotpath).mkdir(parents=True, exist_ok=True)
 
 #####################
 ##### FLAGS #########
@@ -56,8 +75,6 @@ L_circ = u.G_N*m1/np.sqrt(2*Es_i)
 
 
 Ls_i = L_circ*(np.random.rand(N_particles))**0.5
-
-
 Lz_i = Ls_i*(2*np.random.rand(N_particles) - 1)
 
 
@@ -73,48 +90,99 @@ rlist = np.geomspace(0.1*r_isco, 1000*a_i, 1000)
 rho_ana = np.vectorize(SpikeDF.rho_ini)(rlist) #Analytic expression for the density
 rholist_i = orbits.reconstruct_density_full(rlist, Es_i, Ls_i, weights, m1) #Density reconstructed from orbits
 
-#----------------------------------------
-plt.figure()
 
-plt.semilogx(rlist/u.pc, rholist_i/rho_ana, label='MC Reconstruction')
+def make_plot(outstr):
+    
+    outstr = str(outstr)
+    
+    rholist_full = orbits.reconstruct_density_full(rlist, Es, Ls, weights, m1)
+    
+    plt.figure()
 
-x_new, y_new = utilities.block_avg(rlist/u.pc,rholist_i/rho_ana, 10)
-plt.semilogx(x_new, y_new)
+    plt.semilogx(rlist/u.pc, rholist_full/rholist_i, alpha=0.5)
+    x_new, y_new = utilities.density_avg(rlist/u.pc,rholist_full/rholist_i, 10)
+    plt.semilogx(x_new, y_new, label='MC Reconstruction')
+    
+    plt.axhline(1.0, linestyle='-', color='grey', alpha=0.6, zorder=0)
 
-plt.axhline(1.0, linestyle='-', color='grey', alpha=0.6, zorder=0)
+    plt.axvline(a_i/u.pc, linestyle='--', color='grey')
+    plt.axvline(r_orb/u.pc, linestyle='--', color='C1')
 
-plt.axvline(a_i/u.pc, linestyle='--', color='grey')
-#plt.axvline(r_orb/u.pc, linestyle='--', color='C1')
+    #plt.xlim(1e-9, 1e-5)
+    plt.xlim(1e-2*a_i/u.pc, 1e2*a_i/u.pc)
+    plt.ylim(0, 2)
 
-#plt.xlim(1e-9, 1e-5)
-plt.xlim(1e-2*r_isco/u.pc, 1.5*np.max(rlist)/u.pc)
-plt.ylim(0, 2)
+    plt.gca().axvspan(
+        1e-15,               # sufficiently far left
+        binaryC.r_isco/u.pc,
+        facecolor='grey',
+        alpha=0.3,
+        hatch='///'
+    )
+    #plt.axvline(binaryC.r_isco/u.pc, linestyle='--', color='k')
 
-plt.gca().axvspan(1e-15, binaryC.r_isco/u.pc, facecolor='grey', alpha=0.3, hatch='///')
-#plt.axvline(binaryC.r_isco/u.pc, linestyle='--', color='k')
+    plt.xscale('log')
 
-plt.xscale('log')
+    plt.xlabel(r'$r$ [pc]')
+    plt.ylabel(r'$\rho_\mathrm{DM}(r)/\rho_i(r)$')
 
-plt.xlabel(r'$r$ [pc]')
-plt.ylabel(r'$\rho_\mathrm{DM}(r)/\rho_i(r)$')
+    plt.legend(loc='upper right', fontsize=12)
+
+    #plt.text(0.04, 0.95, plotlabel, ha='left', va='top', fontsize=12, transform=plt.gca().transAxes)
+
+    m1str =  utilities.to_scientific(m1/u.Msun)
+    m2str = utilities.to_scientific(m2/u.Msun)
+    plt.title(r"$(m_1, m_2) = (" + m1str + ", " + m2str + ")\,M_\odot$; " + outstr + " orbits")
+    plt.legend(loc='upper right')
+
+    plt.savefig(plotpath + f"Depletion_{IDstr}_Norb_{outstr}.pdf", bbox_inches='tight')
+    plt.close()
+
+#Test
+#------------------------
+
+#MCimri.calculate_dE(Es_i, Ls_i, Lz_i, binaryC, a_i, mult = 1, include_DF=INCLUDE_DF, include_3body=INCLUDE_3BODY)
+
+#assert 1 == 0
 
 
 #Simulate over Norb orbits and reconstruct density
 #---------------------------------------------
-Norb = 1000
-
-dE, dL, dLz = MCimri.calculate_dE(Es_i, Ls_i, Lz_i, binaryC, a_i, include_DF=True, include_3body=False)
+Norb = 12000
+N_out = 10
 
 Es = 1.0*Es_i
 Ls = 1.0*Ls_i
 Lz = 1.0*Lz_i
+
+
 
 r_orb = 1.0*a_i
 t = 0
 
 dN = 1
 
+rho_c = []
+N_list = []
+E_tot = []
+
 for i in tqdm(range(Norb)):
+    if (i > 1001):
+        N_out = 250
+    
+    if (i%N_out == 0):
+        N_list.append(i)
+        rho_c.append(orbits.reconstruct_density_full(np.array([r_orb,]), Es, Ls, weights, m1)[0])
+        rholist_full = orbits.reconstruct_density_full(rlist, Es, Ls, weights, m1)
+        print(i, r_orb/a_i)
+
+        hdrtxt = "Columns: r [pc], rho [Msun/pc**3], rho/rho_i"
+        np.savetxt(datapath + f"Density_{IDstr}_Norb_" + str(int(i)) + ".txt", np.column_stack((rlist/u.pc, rholist_full/(u.Msun/u.pc**3), rholist_full/rholist_i)), header=hdrtxt)
+        if (MAKE_PLOTS): make_plot(i)
+        
+        E_tot.append(np.sum(Es*weights))
+        
+    
     L_circ = u.G_N*m1/np.sqrt(2*np.abs(Es))
     inds = (Es > 0) & (Ls < L_circ)
     
@@ -131,58 +199,32 @@ for i in tqdm(range(Norb)):
     if (i%dN == 0):
         dE, dL, dLz = MCimri.calculate_dE(Es[inds], Ls[inds], Lz[inds], binaryC, r_orb, mult = dN, include_DF=INCLUDE_DF, include_3body=INCLUDE_3BODY)
     
-        Es[inds] += dE
-        Ls[inds] += dL
-        Lz[inds] += dLz
+        Es[inds] += np.nan_to_num(dE)
+        Ls[inds] += np.nan_to_num(dL)
+        Lz[inds] += np.nan_to_num(dLz)
     
     if (r_orb < r_isco):
         break
 
+rho_c.append(orbits.reconstruct_density_full(np.array([r_orb,]), Es, Ls, weights, m1)[0])
 rholist_full = orbits.reconstruct_density_full(rlist, Es, Ls, weights, m1)
+N_list.append(Norb)
+E_tot.append(np.sum(Es*weights))
 
-plt.figure()
+N_list = np.array(N_list)
+rho_c = np.array(rho_c)
+E_tot = np.array(E_tot)
+np.savetxt(datapath + f"rho_c_MC_{IDstr}_Norb_" + str(int(Norb)) + ".txt", np.column_stack((N_list, rho_c/(u.Msun/u.pc**3))))
+np.savetxt(datapath + f"Etot_MC_{IDstr}_Norb_" + str(int(Norb)) + ".txt", np.column_stack((N_list, E_tot/(u.Msun*(u.km/u.s)**2))))
 
-plt.semilogx(rlist/u.pc, rholist_full/rho_ana, label='MC Reconstruction')
-x_new, y_new = utilities.block_avg(rlist/u.pc,rholist_full/rho_ana, 10)
-plt.semilogx(x_new, y_new)
+if (MAKE_PLOTS): 
+    plt.figure()
+    plt.semilogy(N_list, rho_c/rho_c[0])
+    plt.xlabel(r"$N_\mathrm{orb}$")
+    plt.ylabel(r"$\rho(r_2)/\rho_i(r_2)$")
+    plt.savefig(plotpath + f"rho_c_{IDstr}_Norb_" + str(int(Norb)) + ".pdf", bbox_inches='tight')
+    plt.close()
 
-
-plt.semilogx(rlist/u.pc, rholist_full/rholist_i, label='MC Reconstruction', color='grey')
-x_new, y_new = utilities.block_avg(rlist/u.pc,rholist_full/rholist_i, 10)
-plt.semilogx(x_new, y_new, color='k')
-
-plt.axhline(1.0, linestyle='-', color='grey', alpha=0.6, zorder=0)
-
-plt.axvline(a_i/u.pc, linestyle='--', color='grey')
-plt.axvline(r_orb/u.pc, linestyle='--', color='C1')
-
-#plt.xlim(1e-9, 1e-5)
-plt.xlim(1e-2*a_i/u.pc, 1e2*a_i/u.pc)
-plt.ylim(0, 2)
-
-plt.gca().axvspan(
-    1e-15,               # sufficiently far left
-    binaryC.r_isco/u.pc,
-    facecolor='grey',
-    alpha=0.3,
-    hatch='///'
-)
-#plt.axvline(binaryC.r_isco/u.pc, linestyle='--', color='k')
-
-plt.xscale('log')
-
-plt.xlabel(r'$r$ [pc]')
-plt.ylabel(r'$\rho_\mathrm{DM}(r)/\rho_i(r)$')
-
-plt.legend(loc='upper right', fontsize=12)
-
-#plt.text(0.04, 0.95, plotlabel, ha='left', va='top', fontsize=12, transform=plt.gca().transAxes)
-
-m1str =  utilities.to_scientific(m1/u.Msun)
-m2str = utilities.to_scientific(m2/u.Msun)
-plt.title(r"$(m_1, m_2) = (" + m1str + ", " + m2str + ")\,M_\odot$; " + str(int(Norb)) + " orbits")
-plt.legend(loc='upper right')
-
-#plt.savefig("../plots/InspiralDepletion.pdf", bbox_inches='tight')
-
-plt.show()
+hdrtxt = "Columns: r [pc], rho [Msun/pc**3], rho/rho_i"
+np.savetxt(datapath + f"Density_{IDstr}_Norb_" + str(int(Norb)) + ".txt", np.column_stack((rlist/u.pc, rholist_full/(u.Msun/u.pc**3), rholist_full/rholist_i)), header=hdrtxt)
+if (MAKE_PLOTS): make_plot(Norb)

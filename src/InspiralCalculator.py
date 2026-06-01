@@ -34,7 +34,7 @@ binary = binaries.CircularBinary(m1, m2)
 r = args.x*binary.r_isco
 
 print(f"(m1, m2) = ({m1/u.Msun:.2e}, {m2/u.Msun:.2e}) Msun")
-print(f"r = {args.x:.2e} r_isco")
+print(f"r = {args.x:.2e} r_isco = {r/u.pc:.2e} pc")
 
 #N_per_min = 26_000  #1000 particles per sim
 N_per_min  = 18_500  #2000 particles per sim

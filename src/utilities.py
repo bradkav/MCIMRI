@@ -89,6 +89,47 @@ def block_avg(x, y, N):
 
     return x_new, y_new
     
+def density_avg(x, y, N):
+    """
+    Average every N entries of x and y.
+
+    Parameters
+    ----------
+    x, y : array-like
+        Input arrays of equal length.
+    N : int
+        Block size for averaging.
+
+    Returns
+    -------
+    x_new, y_new : np.ndarray
+        Downsampled arrays.
+    """
+
+    x = np.asarray(x)
+    y = np.asarray(y)
+
+    # Trim arrays so length is divisible by N
+    n_trim = len(x) // N * N
+
+    x_trim = x[:n_trim]
+    y_trim = y[:n_trim]
+
+    # Reshape into blocks of size N and average
+    x_new = x_trim.reshape(-1, N).mean(axis=1)
+    N_blocks = len(x_new)
+    
+    y_new = 0.0*x_new
+    for i in range(N_blocks):
+        _x = x_trim[(i*N):((i+1)*N)]
+        _y = y_trim[(i*N):((i+1)*N)]
+        assert len(_x) == N
+        
+        y_new[i] = np.trapz(_y*_x**2, _x)/np.trapz(_x**2, _x)
+    #y_new = y_trim.reshape(-1, N).mean(axis=1)
+
+    return x_new, y_new
+    
 def normalize(Ax, Ay, Az):
     norm = np.sqrt(Ax**2 + Ay**2 + Az**2)
     return Ax/norm, Ay/norm, Az/norm

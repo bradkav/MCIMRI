@@ -70,7 +70,7 @@ np.savetxt(f"../data/Density_{fstr_base}_Norb_final.txt", np.column_stack((rlist
 plt.figure()
 
 plt.semilogx(rlist/u.pc, rho_ratio, alpha=0.5)
-x_new, y_new = utilities.block_avg(rlist/u.pc,rho_ratio, 10)
+x_new, y_new = utilities.density_avg(rlist/u.pc,rho_ratio, 10)
 plt.semilogx(x_new, y_new)
 
 plt.axhline(1.0, linestyle='-', color='grey', alpha=0.6, zorder=0)
