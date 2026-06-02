@@ -47,16 +47,16 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
     
     L_circ = u.G_N*m1/np.sqrt(2*Es)
     
-    Ls_new = Ls
-    Lz_new = Lz
+    Ls_a = Ls
+    Lz_a = Lz
     
     if (elements == "E"):
-        Ls_new = L_circ*np.sqrt(np.random.rand(N))
+        Ls_a = L_circ*np.sqrt(np.random.rand(N))
     
     if (elements == "EL"):
-        Lz_new =  Ls*(2*np.random.rand(N)-1)
+        Lz_a =  Ls*(2*np.random.rand(N)-1)
         
-    rs, vs, x0, y0, z0, vx, vy, vz, Lx, Ly = orbits.sample_phase_space_coordinates(Es, Ls_new, Lz_new, m1)
+    rs, vs, x0, y0, z0, vx, vy, vz, Lx, Ly = orbits.sample_phase_space_coordinates(Es, Ls_a, Lz_a, m1)
     
     #----------------------
     theta0 = np.arccos(z0/rs)
@@ -125,10 +125,10 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
         # Check resonance conditions
         #Horseshoes:
         semi_maj = u.G_N*m1/(2*Es)
-        ecc_sq   = 1 - 2*Es*Ls_new**2/(u.G_N*m1)**2
+        ecc_sq   = 1 - 2*Es*Ls_a**2/(u.G_N*m1)**2
         ecc_sq   = np.abs(ecc_sq)
         ecc      = np.sqrt(ecc_sq)
-        cosinc   = Lz_new/Ls_new
+        cosinc   = Lz_a/Ls_a
         inc      = np.arccos(cosinc)
     
         q        = m2/m1
@@ -327,7 +327,7 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
     Lnew_y = -(x0*vnew_z - z0*vnew_x)
     Lnew_z = +(x0*vnew_y - y0*vnew_x)
     
-    dL_z += Lnew_z - Lz
+    dL_z += Lnew_z - Lz_a
 
     Lnew = np.sqrt(Lnew_x**2 + Lnew_y**2 + Lnew_z**2)
 
