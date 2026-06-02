@@ -41,7 +41,7 @@ r_isco = binaryC.r_isco
 a_i = rM_val*r_isco/6
 #SpikeDF = df.GeneralizedNFWSpike(m1, rho_6=1*u.Msun/u.pc**3, gamma_sp=7/3, r_t=20*a_i, alpha=2)
 
-N_jobs = 16
+N_jobs = 64
 for i in range(N_jobs):
     fstr = f"{fstr_base}_" + str(int(i))
     datapath = "../data/" + fstr + "/"

@@ -21,15 +21,29 @@ import MCimri
 import orbits
 
 from pathlib import Path
+import sys
+
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("-rank", type=int)
+parser.add_argument("-logm2", type=float, default = 4)
+parser.add_argument("-xM", type=float, default = 100)
+
+args = parser.parse_args()
+#m1 = args.m1*u.Msun
+#m2 = args.m2*u.Msun
+
+rank = int(args.rank) + 48
+print("rank:", rank)
 
 #Specify the binary system
 m1 = 4e6*u.Msun
-m2 = (10**4.0)*u.Msun
-a_over_rM    = 100
+m2 = (10**args.logm2)*u.Msun
+a_over_rM    = args.xM
 N_particles = 2000
 dN = 1
 
-SGSK_MODE = True
+SGSK_MODE = False
 SAVE_ORBITS = False
 
 a_over_risco = a_over_rM/6
@@ -41,12 +55,11 @@ a_i = a_over_risco*r_isco
 
 #ID = tools.generate_hash()
 
-import sys
+dN_str = ""
+if (dN > 1):
+    dN_str = f"dN_{str(int(dN))}_"
 
-rank = int(sys.argv[1])
-print("rank:", rank)
-
-fstr = f"logM2_{np.log10(m2/u.Msun):.2f}_NDM_{str(int(N_particles))}_rM_{str(int(np.round(a_over_rM)))}_dN_{str(int(dN))}_SGSK_" + str(int(rank))
+fstr = f"logM2_{np.log10(m2/u.Msun):.2f}_NDM_{str(int(N_particles))}_rM_{str(int(np.round(a_over_rM)))}_{dN_str}" + str(int(rank))
 datapath = "../data/" + fstr + "/"
 plotpath = "../plots/" + fstr + "/"
 
@@ -118,7 +131,7 @@ DYNAMIC = True
 #Define the spike and sample the energies of N_particles particles (or rather, orbits), from P(E) = g(E)*d(E)
 #---------------------------
 SpikeDF = df.GeneralizedNFWSpike(m1, rho_6=1*u.Msun/u.pc**3, gamma_sp=7/3, r_t=20*a_i, alpha=2)
-r_min = 0.1*a_i
+r_min = 0.1*r_isco
 r_max = 10000*a_i
 
 if (SGSK_MODE):
