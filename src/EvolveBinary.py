@@ -53,6 +53,9 @@ r_isco = binaryC.r_isco
 
 a_i = a_over_risco*r_isco
 
+
+L_lc = 4*u.G_N*m1/u.c
+
 #ID = tools.generate_hash()
 
 dN_str = ""
@@ -69,12 +72,17 @@ Path(plotpath).mkdir(parents=True, exist_ok=True)
 def make_plot(N):
     
     rholist_full = orbits.reconstruct_density_full(rlist, Es, Ls, weights, m1)
+    rholist_full_free = orbits.reconstruct_density_full(rlist, Es, Ls, weights_lc, m1)
     
     plt.figure()
 
     plt.semilogx(rlist/u.pc, rholist_full/rholist_i, alpha=0.5)
     x_new, y_new = utilities.block_avg(rlist/u.pc,rholist_full/rholist_i, 10)
     plt.semilogx(x_new, y_new, label='MC Reconstruction')
+    
+    plt.semilogx(rlist/u.pc, rholist_full_free/rholist_i, alpha=0.5)
+    x_new, y_new = utilities.block_avg(rlist/u.pc,rholist_full_free/rholist_i, 10)
+    plt.semilogx(x_new, y_new, label='MC (uncaptured)')
     
     plt.axhline(1.0, linestyle='-', color='grey', alpha=0.6, zorder=0)
 
@@ -112,12 +120,13 @@ def make_plot(N):
 
 def save_density(N):
     rholist_full = orbits.reconstruct_density_full(rlist, Es, Ls, weights, m1)
-    hdrtxt = "Columns: r [pc], rho [Msun/pc**3], rho/rho_i"
-    np.savetxt(datapath + f"Density_{fstr}_Norb_" + str(int(N)) + ".txt", np.column_stack((rlist/u.pc, rholist_full/(u.Msun/u.pc**3), rholist_full/rholist_i)), header=hdrtxt)
+    rholist_full_free = orbits.reconstruct_density_full(rlist, Es, Ls, weights_lc, m1)
+    hdrtxt = "Columns: r [pc], rho [Msun/pc**3], rho/rho_i, rho (uncaptured) [Msun/pc**3], rho (uncaptured)/rho_i"
+    np.savetxt(datapath + f"Density_{fstr}_Norb_" + str(int(N)) + ".txt", np.column_stack((rlist/u.pc, rholist_full/(u.Msun/u.pc**3), rholist_full/rholist_i), rholist_full_free/(u.Msun/u.pc**3), rholist_full_free/rholist_i_free), header=hdrtxt)
 
 def save_orbits(N):
-    hdrtxt = "Columns: E [(km/s)^2], L [pc (km/s)], Lz [pc (km/s)], w [Msun]"
-    outdata = np.column_stack((Es/(u.km/u.s)**2, Ls/(u.pc*u.km/u.s), Lz/(u.pc*u.km/u.s), weights/u.Msun))
+    hdrtxt = "Columns: E [(km/s)^2], L [pc (km/s)], Lz [pc (km/s)], w [Msun], w (uncaptured) [Msun]"
+    outdata = np.column_stack((Es/(u.km/u.s)**2, Ls/(u.pc*u.km/u.s), Lz/(u.pc*u.km/u.s), weights/u.Msun, weights_lc/u.Msun))
     np.savetxt(datapath + f"Orbits_{fstr}_Norb_" + str(int(N)) + ".txt", outdata, header=hdrtxt)
 
 
@@ -160,7 +169,8 @@ else:
 Lz_i = Ls_i*(2*np.random.rand(N_particles) - 1)
 
 m_part = SpikeDF.M_DM_ini(r_max)/N_particles
-weights = m_part*np.ones(N_particles)
+weights = m_part*np.ones(N_particles)]
+weights_lc = 1.0*weights
 
 
 #Define a grid for radii and calculate densities
@@ -168,6 +178,7 @@ weights = m_part*np.ones(N_particles)
 rlist = np.geomspace(0.1*r_isco, 1000*a_i, 1000)
 rho_ana = np.vectorize(SpikeDF.rho_ini)(rlist) #Analytic expression for the density
 rholist_i = orbits.reconstruct_density_full(rlist, Es_i, Ls_i, weights, m1) #Density reconstructed from orbits
+rholist_i_free = orbits.reconstruct_density_full(rlist, Es_i, Ls_i, weights_lc, m1)
 #np.savetxt(f"../data/rlist_{fstr}.txt", rlist)
 
 #Simulate over Norb orbits and reconstruct density
@@ -187,10 +198,20 @@ Lz = 1.0*Lz_i
 r_orb = 1.0*a_i
 t = 0
 
+N_list = []
+E_tot = []
+E_tot_free = []
+
+
 for i in tqdm(range(Norb)):
     
     if (i%N_out == 0):
         print(i, r_orb/a_i)
+        
+        N_list.append(i)
+        E_tot.append(np.sum(Es*weights))
+        E_tot_free.append(np.sum(Es*weights_lc))
+        
         save_density(i+offset)
         if (SAVE_ORBITS): save_orbits(i+offset)
         make_plot(i+offset)
@@ -209,6 +230,8 @@ for i in tqdm(range(Norb)):
         Ls[inds] += dL
         Lz[inds] += dLz
         
+    weights_lc[Ls < L_lc] *= 0.0
+        
     if (DYNAMIC):
         t += binaryC.T_orb(r_orb)
         r_orb = binaryC.r_of_t(t, a_i)
@@ -217,6 +240,17 @@ for i in tqdm(range(Norb)):
         save_density(i+offset)
         if (SAVE_ORBITS): save_orbits(i+offset)
         make_plot(i+offset)
+        
+        N_list.append(i)
+        E_tot.append(np.sum(Es*weights))
+        E_tot_free.append(np.sum(Es*weights_lc))
+        
+        N_list = np.array(N_list)
+        E_tot = np.array(E_tot)
+        E_tot_free = np.array(E_tot_free)
+        
+        np.savetxt(datapath + f"Etot_MC_{IDstr}_Norb_" + str(int(Norb)) + ".txt", np.column_stack((N_list, E_tot/(u.Msun*(u.km/u.s)**2), E_tot_free/(u.Msun*(u.km/u.s)**2))))
+        
         break
 
 #plt.show()
