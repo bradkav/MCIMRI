@@ -26,8 +26,13 @@ import sys
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("-rank", type=int)
+parser.add_argument("-logm1", type=float, default = np.log10(4e6))
 parser.add_argument("-logm2", type=float, default = 4)
-parser.add_argument("-xM", type=float, default = 100)
+
+group = parser.add_mutually_exclusive_group(required=True)
+group.add_argument('-rS', type = float)
+group.add_argument('-pc', type = float)
+
 
 args = parser.parse_args()
 #m1 = args.m1*u.Msun
@@ -37,22 +42,26 @@ rank = int(args.rank)
 print("rank:", rank)
 
 #Specify the binary system
-m1 = 4e6*u.Msun
+m1 = (10**args.logm1)*u.Msun
 m2 = (10**args.logm2)*u.Msun
-a_over_rM    = args.xM
+
+binaryC = binaries.CircularBinary(m1, m2)
+r_isco = binaryC.r_isco
+
+rS = r_isco/3
+
+if (args.rS is not None):
+    a_i = args.rS*rS
+    rstr = f"r_{str(int(np.round(args.rS)))}_rS"
+else:
+    a_i = args.pc*u.pc
+    rstr = f"r_{args.pc:.2e}_pc"
+
 N_particles = 2000
 dN = 1
 
 SGSK_MODE = False
 SAVE_ORBITS = False
-
-a_over_risco = a_over_rM/6
-
-binaryC = binaries.CircularBinary(m1, m2)
-r_isco = binaryC.r_isco
-
-a_i = a_over_risco*r_isco
-
 
 L_lc = 4*u.G_N*m1/u.c
 
@@ -62,7 +71,8 @@ dN_str = ""
 if (dN > 1):
     dN_str = f"dN_{str(int(dN))}_"
 
-fstr = f"logM2_{np.log10(m2/u.Msun):.2f}_NDM_{str(int(N_particles))}_rM_{str(int(np.round(a_over_rM)))}_lc_allorbits_{dN_str}" + str(int(rank))
+    
+fstr = f"logM1_{np.log10(m1/u.Msun):.2f}_logM2_{np.log10(m2/u.Msun):.2f}_{rstr}_{dN_str}" + str(int(rank))
 datapath = "../data/" + fstr + "/"
 plotpath = "../plots/" + fstr + "/"
 
@@ -190,7 +200,7 @@ print("Number of orbits to merger:", N_to_merge)
 Norb = int(1.1*N_to_merge)
 offset = 0
 
-N_out = int(max(10_000, ((Norb/50) // 10_000) * 10_000))
+N_out = int(max(10_000, ((Norb/200) // 10_000) * 10_000))
 
 
 Es = 1.0*Es_i
