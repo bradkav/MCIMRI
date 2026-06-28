@@ -16,18 +16,21 @@ import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 18})
 
 import glob
+import re
 
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument("-logm1", type=float, default = np.log10(4e6))
+#parser.add_argument("-m1", type=float, default = 4e6)
 parser.add_argument("-logm2", type=float, default = 4)
 parser.add_argument("-rM", type=float, default = 100)
 
 args = parser.parse_args()
-m1 = (10**args.logm1)*u.Msun
 m2 = (10**args.logm2)*u.Msun
 rM_val = args.rM
 
+
+#Specify the binary system
+m1 = 4e6*u.Msun
 
 fstr_base = f"logM2_{np.log10(m2/u.Msun):.2f}_NDM_2000_rM_{str(int(rM_val))}_lc"
 print(fstr_base)
@@ -40,42 +43,62 @@ r_isco = binaryC.r_isco
 a_i = rM_val*r_isco/6
 #SpikeDF = df.GeneralizedNFWSpike(m1, rho_6=1*u.Msun/u.pc**3, gamma_sp=7/3, r_t=20*a_i, alpha=2)
 
-N_jobs = 32
-for i in range(N_jobs):
-    fstr = f"{fstr_base}_" + str(int(i))
-    datapath = "../data/" + fstr + "/"
+j = 0
+RUNNING = True
 
-    files = glob.glob(datapath + "Density_" + fstr + "_Norb_*" + ext)
-    if not files:
-        print("No .txt.gz files found, trying with .txt extension...")
-        ext = ".txt"
+while RUNNING:
+    print(j)
+    N_jobs = 32
+    for i in range(N_jobs):
+        fstr = f"{fstr_base}_" + str(int(i))
+        datapath = "../data/" + fstr + "/"
+
+        ext = ".txt.gz"
         files = glob.glob(datapath + "Density_" + fstr + "_Norb_*" + ext)
+        if not files:
+            print("No .txt.gz files found, trying with .txt extension...")
+            ext = ".txt"
+            files = glob.glob(datapath + "Density_" + fstr + "_Norb_*" + ext)   
+ 
+        pairs = sorted(
+            [(f, int(re.search(r"Norb_(\d+)", f).group(1))) for f in files],
+                key=lambda x: x[1]
+            )
+
+        files_sorted = [f for f, _ in pairs]
+        numbers_sorted = [n for _, n in pairs]
+   
+        file_j = files_sorted[j]
+        n_j = numbers_sorted[j]
+
+        print(file_j)
+        data = np.loadtxt(file_j)
     
-    largest_file = max(files, key=lambda f: int(f.split('_')[-1].split('.')[0]))
-    data = np.loadtxt(largest_file)
-    if i == 0:
-        print(largest_file)
-        rlist = data[:,0]*u.pc
-        rho_full = data[:,1]*u.Msun/u.pc**3
-        rho_ratio = data[:,2]
-        rho_full_free = data[:,3]*u.Msun/u.pc**3
-        rho_ratio_free = data[:,4]
-    else:
-        rho_full += data[:,1]*u.Msun/u.pc**3
-        rho_ratio += data[:,2]
-        rho_full_free += data[:,3]*u.Msun/u.pc**3
-        rho_ratio_free += data[:,4]
+        if i == 0:
+            rlist = data[:,0]*u.pc
+            rho_full = data[:,1]*u.Msun/u.pc**3
+            rho_ratio = data[:,2]
+            rho_full_free = data[:,3]*u.Msun/u.pc**3
+            rho_ratio_free = data[:,4]
+        else:
+            rho_full += data[:,1]*u.Msun/u.pc**3
+            rho_ratio += data[:,2]
+            rho_full_free += data[:,3]*u.Msun/u.pc**3
+            rho_ratio_free += data[:,4]
 
-rho_full /= N_jobs
-rho_ratio /= N_jobs
+    rho_full /= N_jobs
+    rho_ratio /= N_jobs
 
-rho_full_free /= N_jobs
-rho_ratio_free /= N_jobs
+    rho_full_free /= N_jobs
+    rho_ratio_free /= N_jobs
 
-hdrtxt = "Columns: r [pc], rho [Msun/pc**3], rho/rho_i, rho (uncaptured) [Msun/pc**3], rho/rho_i (uncaptured)"
-np.savetxt(f"../data/Density_{fstr_base}_Norb_final.txt", np.column_stack((rlist/u.pc, rho_full/(u.Msun/u.pc**3), rho_ratio, rho_full_free/(u.Msun/u.pc**3), rho_ratio_free)), header=hdrtxt)
+    hdrtxt = "Columns: r [pc], rho [Msun/pc**3], rho/rho_i, rho (uncaptured) [Msun/pc**3], rho/rho_i (uncaptured)"
+    np.savetxt(datapath + f"Density_{fstr_base}_all_Norb_{str(n_j)}.txt", np.column_stack((rlist/u.pc, rho_full/(u.Msun/u.pc**3), rho_ratio, rho_full_free/(u.Msun/u.pc**3), rho_ratio_free)), header=hdrtxt)
 
-    
+    j += 1
+    if (j == 10001):
+        RUNNING = False
+        
 #---------------
 
 plt.figure()

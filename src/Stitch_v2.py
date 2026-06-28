@@ -21,15 +21,16 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("-logm1", type=float, default = np.log10(4e6))
 parser.add_argument("-logm2", type=float, default = 4)
-parser.add_argument("-rM", type=float, default = 100)
+parser.add_argument("-r_pc", type=float, default = 1e-9)
 
 args = parser.parse_args()
 m1 = (10**args.logm1)*u.Msun
 m2 = (10**args.logm2)*u.Msun
-rM_val = args.rM
+a_i = args.r_pc*u.pc
 
+rstr = f"r_{a_i/u.pc:.2e}_pc"
 
-fstr_base = f"logM2_{np.log10(m2/u.Msun):.2f}_NDM_2000_rM_{str(int(rM_val))}_lc"
+fstr_base = f"logM1_{np.log10(m1/u.Msun):.2f}_logM2_{np.log10(m2/u.Msun):.2f}_{rstr}"
 print(fstr_base)
 
 ext = ".txt.gz"
@@ -37,7 +38,7 @@ ext = ".txt.gz"
 binaryC = binaries.CircularBinary(m1, m2)
 r_isco = binaryC.r_isco
 
-a_i = rM_val*r_isco/6
+#a_i = rM_val*r_isco/6
 #SpikeDF = df.GeneralizedNFWSpike(m1, rho_6=1*u.Msun/u.pc**3, gamma_sp=7/3, r_t=20*a_i, alpha=2)
 
 N_jobs = 32

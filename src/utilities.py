@@ -5,6 +5,11 @@ from tqdm import tqdm
 
 from scipy.interpolate import interp1d
 
+try:
+    from numpy import trapz
+except:
+    from numpy import trapezoid as trapz
+
 import matplotlib
 import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 18})
@@ -125,7 +130,7 @@ def density_avg(x, y, N):
         _y = y_trim[(i*N):((i+1)*N)]
         assert len(_x) == N
         
-        y_new[i] = np.trapz(_y*_x**2, _x)/np.trapz(_x**2, _x)
+        y_new[i] = trapz(_y*_x**2, _x)/trapz(_x**2, _x)
     #y_new = y_trim.reshape(-1, N).mean(axis=1)
 
     return x_new, y_new
