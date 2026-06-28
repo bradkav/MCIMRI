@@ -196,6 +196,11 @@ Nsnaps_target = 200
 
 N_out = int(max(Nout_min, ((Norb/Nsnaps_target) // Nout_min) * Nout_min))
 
+#---------- FIXED
+Norb = 15000
+N_out = 100
+
+
 Es = 1.0*Es_i
 Ls = 1.0*Ls_i
 Lz = 1.0*Lz_i
