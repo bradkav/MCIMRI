@@ -163,7 +163,8 @@ class TimeSeries:
     def __init__(self, m1):
         self.m1 = m1
         
-        self.N          = None
+        self.Ns         = None
+        self.rs         = None
         self.E_tot      = None
         self.E_tot_free = None
         self.rho_r      = None
@@ -183,15 +184,19 @@ class TimeSeries:
         rho_r = self.calc_rho_r(r, Es, Ls, w)
         rho_r_free = self.calc_rho_r(r, Es, Ls, w_c)
         
-        if (self.N is None):
-            self.N = [N]
+        if (self.Ns is None):
+            self.Ns = [N]
+            self.rs = [r]
+            
             self.E_tot = [Etot]
             self.E_tot_free = [Etot_free]
         
             self.rho_r = [rho_r]
             self.rho_r_free = [rho_r_free]
         else:
-            self.N.append(N)
+            self.Ns.append(N)
+            self.rs.append(r)
+            
             self.E_tot.append(Etot)
             self.E_tot_free.append(Etot_free)
         
@@ -199,7 +204,9 @@ class TimeSeries:
             self.rho_r_free.append(rho_r_free)
         
     def save(self, datapath, fstr):
-        N_arr = np.array(self.N)
+        N_arr = np.array(self.Ns)
+        r_arr = np.array(self.rs)
+        
         E_arr = np.array(self.E_tot)
         E_free_arr = np.array(self.E_tot_free)
         rho_r_arr = np.array(self.rho_r)
@@ -208,7 +215,7 @@ class TimeSeries:
         hdrtxt = "Columns: N_orbs, Total DM energy (no capture) [Msun (km/s)^2], Total DM energy (including capture) [Msun (km/s)^2]"
         np.savetxt(datapath + f"Etot_{fstr}.txt.gz", np.column_stack((N_arr, E_arr/(u.Msun*(u.km/u.s)**2), E_free_arr/(u.Msun*(u.km/u.s)**2))), header=hdrtxt, fmt='%.5e')
         
-        hdrtxt = "Columns: N_orbs, rho(r_2), no capture [Msun/pc**3], rho(r_2), including capture [Msun/pc**3]"
-        np.savetxt(datapath + f"Density_r_{fstr}.txt.gz", np.column_stack((N_arr, rho_r_arr/(u.Msun/u.pc**3), rho_r_free_arr/(u.Msun/u.pc**3))), header=hdrtxt, fmt='%.5e')
+        hdrtxt = "Columns: N_orbs, r_2 [pc], rho(r_2), no capture [Msun/pc**3], rho(r_2), including capture [Msun/pc**3]"
+        np.savetxt(datapath + f"Density_r_{fstr}.txt.gz", np.column_stack((N_arr, r_arr/u.pc, rho_r_arr/(u.Msun/u.pc**3), rho_r_free_arr/(u.Msun/u.pc**3))), header=hdrtxt, fmt='%.5e')
 
 
