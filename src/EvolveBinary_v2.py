@@ -4,7 +4,6 @@ from numpy import cos, sin
 #from tqdm import tqdm
 tqdm = lambda x: x
 
-
 from scipy.interpolate import interp1d
 
 import matplotlib
@@ -23,6 +22,21 @@ import orbits
 from pathlib import Path
 import sys
 
+# Flags and parameters
+#---------------------
+INCLUDE_DF = True
+INCLUDE_3BODY = True
+DYNAMIC = True
+SAVE_ORBITS = False
+
+N_particles = 2000
+dN = 1
+
+#####################
+
+
+#Command line arguments
+#----------------------
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("-rank", type=int)
@@ -35,18 +49,17 @@ group.add_argument('-pc', type = float)
 
 
 args = parser.parse_args()
-#m1 = args.m1*u.Msun
-#m2 = args.m2*u.Msun
 
 rank = int(args.rank)
 print("rank:", rank)
 
 #Specify the binary system
+#-------------------------
 m1 = (10**args.logm1)*u.Msun
 m2 = (10**args.logm2)*u.Msun
 
-binaryC = binaries.CircularBinary(m1, m2)
-r_isco = binaryC.r_isco
+binary = binaries.CircularBinary(m1, m2)
+r_isco = binary.r_isco
 
 rS = r_isco/3
 
@@ -57,24 +70,21 @@ else:
     a_i = args.pc*u.pc
     rstr = f"r_{args.pc:.2e}_pc"
 
-N_particles = 2000
-dN = 1
-
-SGSK_MODE = False
-SAVE_ORBITS = False
-
 L_lc = 4*u.G_N*m1/u.c
 
-#ID = tools.generate_hash()
+
+# Set up file system
+#-------------------
 
 dN_str = ""
 if (dN > 1):
-    dN_str = f"dN_{str(int(dN))}_"
+    dN_str = f"_dN_{str(int(dN))}"
 
-    
-fstr = f"logM1_{np.log10(m1/u.Msun):.2f}_logM2_{np.log10(m2/u.Msun):.2f}_{rstr}_{dN_str}" + str(int(rank))
-datapath = "../data/" + fstr + "/"
-plotpath = "../plots/" + fstr + "/"
+
+froot = f"logM1_{np.log10(m1/u.Msun):.2f}_logM2_{np.log10(m2/u.Msun):.2f}_{rstr}{dN_str}"
+fstr = froot + "_" + str(int(rank))
+datapath = "../data/" + froot + "/" + fstr + "/"
+plotpath = "../plots/" + froot + "/" + fstr + "/"
 
 Path(datapath).mkdir(parents=True, exist_ok=True)
 Path(plotpath).mkdir(parents=True, exist_ok=True)
@@ -86,13 +96,14 @@ def make_plot(N):
     
     plt.figure()
 
-    plt.semilogx(rlist/u.pc, rholist_full/rholist_i, alpha=0.5)
-    x_new, y_new = utilities.block_avg(rlist/u.pc,rholist_full/rholist_i, 10)
-    plt.semilogx(x_new, y_new, label='MC Reconstruction')
+    with np.errstate(divide='ignore', invalid='ignore'):
+        plt.semilogx(rlist/u.pc, rholist_full/rholist_i, alpha=0.5)
+        x_new, y_new = utilities.block_avg(rlist/u.pc,rholist_full/rholist_i, 10)
+        plt.semilogx(x_new, y_new, label='MC Reconstruction')
     
-    plt.semilogx(rlist/u.pc, rholist_full_free/rholist_i_free, alpha=0.5)
-    x_new, y_new = utilities.block_avg(rlist/u.pc,rholist_full_free/rholist_i_free, 10)
-    plt.semilogx(x_new, y_new, label='MC (uncaptured)')
+        plt.semilogx(rlist/u.pc, rholist_full_free/rholist_i_free, alpha=0.5)
+        x_new, y_new = utilities.block_avg(rlist/u.pc,rholist_full_free/rholist_i_free, 10)
+        plt.semilogx(x_new, y_new, label='MC (uncaptured)')
     
     plt.axhline(1.0, linestyle='-', color='grey', alpha=0.6, zorder=0)
 
@@ -105,7 +116,7 @@ def make_plot(N):
 
     plt.gca().axvspan(
         1e-15,               # sufficiently far left
-        binaryC.r_isco/u.pc,
+        binary.r_isco/u.pc,
         facecolor='grey',
         alpha=0.3,
         hatch='///'
@@ -132,20 +143,17 @@ def save_density(N):
     rholist_full = orbits.reconstruct_density_full(rlist, Es, Ls, weights, m1)
     rholist_full_free = orbits.reconstruct_density_full(rlist, Es, Ls, weights_lc, m1)
     hdrtxt = "Columns: r [pc], rho [Msun/pc**3], rho/rho_i, rho (uncaptured) [Msun/pc**3], rho (uncaptured)/rho_i"
-    np.savetxt(datapath + f"Density_{fstr}_Norb_" + str(int(N)) + ".txt.gz", np.column_stack((rlist/u.pc, rholist_full/(u.Msun/u.pc**3), rholist_full/rholist_i, rholist_full_free/(u.Msun/u.pc**3), rholist_full_free/rholist_i_free)), header=hdrtxt)
+    
+    with np.errstate(divide='ignore', invalid='ignore'):
+        np.savetxt(datapath + f"Density_{fstr}_Norb_" + str(int(N)) + ".txt.gz", np.column_stack((rlist/u.pc, rholist_full/(u.Msun/u.pc**3), rholist_full/rholist_i, rholist_full_free/(u.Msun/u.pc**3), rholist_full_free/rholist_i_free)), header=hdrtxt, fmt='%.5e')
 
 def save_orbits(N):
     hdrtxt = "Columns: E [(km/s)^2], L [pc (km/s)], Lz [pc (km/s)], w [Msun], w (uncaptured) [Msun]"
     outdata = np.column_stack((Es/(u.km/u.s)**2, Ls/(u.pc*u.km/u.s), Lz/(u.pc*u.km/u.s), weights/u.Msun, weights_lc/u.Msun))
-    np.savetxt(datapath + f"Orbits_{fstr}_Norb_" + str(int(N)) + ".txt.gz", outdata, header=hdrtxt)
+    
 
 
-#####################
-##### FLAGS #########
-#####################
-INCLUDE_DF = True
-INCLUDE_3BODY = True
-DYNAMIC = True
+
 
 #Define the spike and sample the energies of N_particles particles (or rather, orbits), from P(E) = g(E)*d(E)
 #---------------------------
@@ -153,28 +161,10 @@ SpikeDF = df.GeneralizedNFWSpike(m1, rho_6=1*u.Msun/u.pc**3, gamma_sp=7/3, r_t=2
 r_min = 0.1*r_isco
 r_max = 10000*a_i
 
-if (SGSK_MODE):
-    ecc = 0.67
-    gamma = 7/3
-    
-    _u = np.random.rand(N_particles)
-    #rp_min = r_isco
-    #rp_max = 330*r_isco
-    
-    rp_min = r_min
-    rp_max = r_max
-    rps = rp_min*(rp_max/rp_min)**_u
 
-    Es_i = np.ones(N_particles)*(u.G_N*m1)*(1-ecc)/(2*rps)
-    L_circ = u.G_N*m1/np.sqrt(2*Es_i)
-    Ls_i = L_circ*np.sqrt(1 - ecc**2)
-    
-    weights = rps**(-(gamma - 3))
-    
-else:
-    Es_i = SpikeDF.draw_E(r_max=r_max, N = N_particles)
-    L_circ = u.G_N*m1/np.sqrt(2*Es_i)
-    Ls_i = L_circ*np.sqrt(np.random.rand(N_particles))
+Es_i = SpikeDF.draw_E(r_max=r_max, N = N_particles)
+L_circ = u.G_N*m1/np.sqrt(2*Es_i)
+Ls_i = L_circ*np.sqrt(np.random.rand(N_particles))
 
 Lz_i = Ls_i*(2*np.random.rand(N_particles) - 1)
 
@@ -192,16 +182,19 @@ rholist_i = orbits.reconstruct_density_full(rlist, Es_i, Ls_i, weights, m1) #Den
 rholist_i_free = orbits.reconstruct_density_full(rlist, Es_i, Ls_i, weights_lc, m1)
 #np.savetxt(f"../data/rlist_{fstr}.txt", rlist)
 
+
 #Simulate over Norb orbits and reconstruct density
 #---------------------------------------------
-N_to_merge = binaryC.Norb_to_merger(a_i)
+N_to_merge = binary.Norb_to_merger(a_i)
 print("Number of orbits to merger:", N_to_merge)
 
 Norb = int(1.1*N_to_merge)
 offset = 0
 
-N_out = int(max(10_000, ((Norb/200) // 10_000) * 10_000))
+Nout_min = 10_000
+Nsnaps_target = 200
 
+N_out = int(max(Nout_min, ((Norb/Nsnaps_target) // Nout_min) * Nout_min))
 
 Es = 1.0*Es_i
 Ls = 1.0*Ls_i
@@ -210,23 +203,20 @@ Lz = 1.0*Lz_i
 r_orb = 1.0*a_i
 t = 0
 
-N_list = []
-E_tot = []
-E_tot_free = []
+ts = utilities.TimeSeries(binary.m1)
 
+ts.add(0, Es, Ls, weights, weights_lc, r_orb)
 
 for i in tqdm(range(Norb)):
     
     if (i%N_out == 0):
-        print(i, r_orb/a_i)
+        print("Number of orbits, r/r_i:", i, r_orb/a_i)
         
-        N_list.append(i)
-        E_tot.append(np.sum(Es*weights))
-        E_tot_free.append(np.sum(Es*weights_lc))
+        ts.add(i, Es, Ls, weights, weights_lc, r_orb)
         
         save_density(i+offset)
-        if (SAVE_ORBITS): save_orbits(i+offset)
         make_plot(i+offset)
+        if (SAVE_ORBITS): save_orbits(i+offset)
     
     L_circ = u.G_N*m1/np.sqrt(2*np.abs(Es))
     inds = (Es > 0) & (Ls < L_circ)
@@ -236,7 +226,7 @@ for i in tqdm(range(Norb)):
             print(np.sum(L_out))
             
     if (i%dN == 0):
-        dE, dL, dLz = MCimri.calculate_dE(Es[inds], Ls[inds], Lz[inds], binaryC, r_orb, mult = dN, include_DF=INCLUDE_DF, include_3body=INCLUDE_3BODY)
+        dE, dL, dLz = MCimri.calculate_dE(Es[inds], Ls[inds], Lz[inds], binary, r_orb, mult = dN, include_DF=INCLUDE_DF, include_3body=INCLUDE_3BODY)
     
         Es[inds] += dE
         Ls[inds] += dL
@@ -245,23 +235,18 @@ for i in tqdm(range(Norb)):
     weights_lc[Ls < L_lc] *= 0.0
         
     if (DYNAMIC):
-        t += binaryC.T_orb(r_orb)
-        r_orb = binaryC.r_of_t(t, a_i)
+        t += binary.T_orb(r_orb)
+        r_orb = binary.r_of_t(t, a_i)
         
     if (r_orb < r_isco):
+        
+        ts.add(i, Es, Ls, weights, weights_lc, r_orb)
+        
         save_density(i+offset)
-        if (SAVE_ORBITS): save_orbits(i+offset)
         make_plot(i+offset)
+        if (SAVE_ORBITS): save_orbits(i+offset)
         
-        N_list.append(i)
-        E_tot.append(np.sum(Es*weights))
-        E_tot_free.append(np.sum(Es*weights_lc))
-        
-        N_list = np.array(N_list)
-        E_tot = np.array(E_tot)
-        E_tot_free = np.array(E_tot_free)
-        
-        np.savetxt(datapath + f"Etot_MC_{fstr}.txt.gz", np.column_stack((N_list, E_tot/(u.Msun*(u.km/u.s)**2), E_tot_free/(u.Msun*(u.km/u.s)**2))))
+        ts.save(datapath, fstr)
         
         break
 

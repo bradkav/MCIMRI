@@ -19,6 +19,7 @@ from NbodyIMRI import units as u
 from NbodyIMRI import tools
 
 import binaries
+import orbits
 
 import math
 
@@ -158,3 +159,56 @@ def get_random_direction(N=1):
     return theta, phi
     
     
+class TimeSeries:
+    def __init__(self, m1):
+        self.m1 = m1
+        
+        self.N          = None
+        self.E_tot      = None
+        self.E_tot_free = None
+        self.rho_r      = None
+        self.rho_r_free = None
+        
+    def calc_E_tot(self, E, w):
+        return np.sum(E*w)
+        
+    def calc_rho_r(self, r, E, L, w):
+        return orbits.reconstruct_density_full(np.array([r,]), E, L, w, self.m1)[0]
+
+    def add(self, N, Es, Ls, w, w_c, r):
+        
+        Etot = self.calc_E_tot(Es, w)
+        Etot_free = self.calc_E_tot(Es, w_c)
+        
+        rho_r = self.calc_rho_r(r, Es, Ls, w)
+        rho_r_free = self.calc_rho_r(r, Es, Ls, w_c)
+        
+        if (self.N is None):
+            self.N = [N]
+            self.E_tot = [Etot]
+            self.E_tot_free = [Etot_free]
+        
+            self.rho_r = [rho_r]
+            self.rho_r_free = [rho_r_free]
+        else:
+            self.N.append(N)
+            self.E_tot.append(Etot)
+            self.E_tot_free.append(Etot_free)
+        
+            self.rho_r.append(rho_r)
+            self.rho_r_free.append(rho_r_free)
+        
+    def save(self, datapath, fstr):
+        N_arr = np.array(self.N)
+        E_arr = np.array(self.E_tot)
+        E_free_arr = np.array(self.E_tot_free)
+        rho_r_arr = np.array(self.rho_r)
+        rho_r_free_arr = np.array(self.rho_r_free)
+        
+        hdrtxt = "Columns: N_orbs, Total DM energy (no capture) [Msun (km/s)^2], Total DM energy (including capture) [Msun (km/s)^2]"
+        np.savetxt(datapath + f"Etot_{fstr}.txt.gz", np.column_stack((N_arr, E_arr/(u.Msun*(u.km/u.s)**2), E_free_arr/(u.Msun*(u.km/u.s)**2))), header=hdrtxt, fmt='%.5e')
+        
+        hdrtxt = "Columns: N_orbs, rho(r_2), no capture [Msun/pc**3], rho(r_2), including capture [Msun/pc**3]"
+        np.savetxt(datapath + f"Density_r_{fstr}.txt.gz", np.column_stack((N_arr, rho_r_arr/(u.Msun/u.pc**3), rho_r_free_arr/(u.Msun/u.pc**3))), header=hdrtxt, fmt='%.5e')
+
+
