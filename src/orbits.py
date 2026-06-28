@@ -161,3 +161,42 @@ def reconstruct_density_full(r, Es, Ls, weights, m1):
                 N_out += 1
     #print(N_out)
     return rho
+    
+def reconstruct_density_full_th(r, theta, Es, Ls, Lz, weights, m1):
+    rho = 0.0*theta
+    
+    N_out = 0
+    for i, E in enumerate(Es):
+        if (E > 0):
+            L_circ = u.G_N*m1/np.sqrt(2*E)
+            if (Ls[i] <= L_circ):
+                
+                vr_sq = 2*(psi(r, m1) - E) - Ls[i]**2/r**2
+                if (vr_sq < 0):
+                    continue
+                
+                eps = (1e-10*Ls[i])**2
+                
+                
+                Lsq   = Ls[i]**2*np.sin(theta)**2 - Lz[i]**2
+                
+                inds = (Lsq > 0)
+                vr = np.sqrt(np.clip(vr_sq, 0, 1e30))
+                #Lt = np.sqrt(np.clip(Lsq, 0, 1e30))
+                
+                
+                Lt = np.sqrt(np.maximum(Lsq, eps))
+
+                T = 2*np.pi*u.G_N*m1/((2*E)**1.5)
+
+                #Assuming the initial samples are drawn from P(E) = g(E)*f(E)
+                #g = E**(-5/2)
+                #w = 1/(Ls[i]*T)
+                w = weights[i]
+                rho[inds] += (w/(4*np.pi*r**2))*(2/vr)*(1/T)*(2*Ls[i]/Lt[inds])
+                #rho[inds] += (2*Ls[i]/Lt[inds])
+                
+            else:
+                N_out += 1
+    #print(N_out)
+    return rho

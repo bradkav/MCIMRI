@@ -21,31 +21,31 @@ import MCimri
 import orbits
 
 #Specify the binary system
-m1 = 10.0*u.Msun
-m2 = 0.15*u.Msun
+#m1 = 10.0*u.Msun
+#m2 = 0.15*u.Msun
 #m1 = 7.46*u.Msun
 #m2 = 0.18*u.Msun
 #rsun = 695700*u.km
 #a_i = 2.54*rsun
-a_i = 1e-7*u.pc
+#a_i = 1e-7*u.pc
 
 
 
 #Specify the binary system
-#m1 = 4e6*u.Msun
-#m2 = (10**3.5)*u.Msun
-#a_over_risco = 12.26
+m1 = 4e6*u.Msun
+m2 = (10**4)*u.Msun
+a_over_risco = 12.26
 
 binaryC = binaries.CircularBinary(m1, m2)
 r_isco = binaryC.r_isco
 
-#a_i = a_over_risco*r_isco
+a_i = a_over_risco*r_isco
 
 q  = m2/m1
 
 #IDstr = "SystemA_res"
-IDstr = "M1_10_M2_0.15_doinner_Nout_50"
-#IDstr = "Test"
+#IDstr = "M1_10_M2_0.15_doinner_Nout_50"
+IDstr = "Test"
 datapath = "../data/" + IDstr + "/"
 plotpath = "../plots/" + IDstr + "/"
 
@@ -63,7 +63,7 @@ DYNAMIC = False
 
 #Define the spike and sample the energies of N_particles particles (or rather, orbits), from P(E) = g(E)*d(E)
 #---------------------------
-N_particles = 10000
+N_particles = 25000
 SpikeDF = df.GeneralizedNFWSpike(m1, rho_6=1*u.Msun/u.pc**3, gamma_sp=7/3, r_t=20*a_i, alpha=2)
 r_min = 0.1*r_isco
 r_max = 10000*a_i
@@ -90,6 +90,12 @@ rlist = np.geomspace(0.1*r_isco, 1000*a_i, 1000)
 rho_ana = np.vectorize(SpikeDF.rho_ini)(rlist) #Analytic expression for the density
 rholist_i = orbits.reconstruct_density_full(rlist, Es_i, Ls_i, weights, m1) #Density reconstructed from orbits
 
+thetas = np.linspace(0, np.pi, 201)
+
+rho_th_i = orbits.reconstruct_density_full_th(a_i, thetas, Es_i, Ls_i, Lz_i, weights, m1)
+
+plt.figure()
+plt.plot(thetas, rho_th_i)
 
 def make_plot(outstr):
     
@@ -148,8 +154,8 @@ def make_plot(outstr):
 
 #Simulate over Norb orbits and reconstruct density
 #---------------------------------------------
-Norb = 12000
-N_out = 10
+Norb = 20000
+N_out = 4000
 
 Es = 1.0*Es_i
 Ls = 1.0*Ls_i
@@ -167,8 +173,8 @@ N_list = []
 E_tot = []
 
 for i in tqdm(range(Norb)):
-    if (i > 1001):
-        N_out = 250
+    #if (i > 1001):
+    #    N_out = 250
     
     if (i%N_out == 0):
         N_list.append(i)
@@ -178,6 +184,11 @@ for i in tqdm(range(Norb)):
 
         hdrtxt = "Columns: r [pc], rho [Msun/pc**3], rho/rho_i"
         np.savetxt(datapath + f"Density_{IDstr}_Norb_" + str(int(i)) + ".txt", np.column_stack((rlist/u.pc, rholist_full/(u.Msun/u.pc**3), rholist_full/rholist_i)), header=hdrtxt)
+        
+        rho_th = orbits.reconstruct_density_full_th(a_i, thetas, Es, Ls, Lz, weights, m1)
+        np.savetxt(datapath + f"Density_theta_{IDstr}_Norb_" + str(int(i)) + ".txt", np.column_stack((thetas, rho_th/(u.Msun/u.pc**3))))
+        plt.plot(thetas, rho_th, label=str(int(i)) + " orbits")
+        
         if (MAKE_PLOTS): make_plot(i)
         
         E_tot.append(np.sum(Es*weights))
@@ -216,6 +227,41 @@ rho_c = np.array(rho_c)
 E_tot = np.array(E_tot)
 np.savetxt(datapath + f"rho_c_MC_{IDstr}_Norb_" + str(int(Norb)) + ".txt", np.column_stack((N_list, rho_c/(u.Msun/u.pc**3))))
 np.savetxt(datapath + f"Etot_MC_{IDstr}_Norb_" + str(int(Norb)) + ".txt", np.column_stack((N_list, E_tot/(u.Msun*(u.km/u.s)**2))))
+
+rho_th_f = orbits.reconstruct_density_full_th(a_i, thetas, Es, Ls, Lz, weights, m1)
+np.savetxt(datapath + f"Density_theta_{IDstr}_Norb_" + str(int(Norb)) + ".txt", np.column_stack((thetas, rho_th_f/(u.Msun/u.pc**3))))
+
+
+plt.plot(thetas, rho_th_f, label = str(int(Norb)) + " orbits")
+
+plt.xlabel(r"$\theta$")
+plt.ylabel(r"$\rho(r_2, \theta)$ [Arb. units]")
+
+plt.legend(loc='best', fontsize=10)
+
+plt.savefig("../plots/Density_angular.pdf", bbox_inches='tight')
+
+plt.figure()
+vr_sq = 2*(orbits.psi(a_i, m1) - Es_i) - Ls_i**2/a_i**2
+inds = vr_sq > 0
+
+bins = np.linspace(-1, 1, 25)
+plt.hist(Lz_i[inds]/Ls_i[inds],bins, alpha=0.8, label="Initial Distribution")
+
+vr_sq = 2*(orbits.psi(a_i, m1) - Es) - Ls**2/a_i**2
+inds = vr_sq > 0
+
+bins = np.linspace(-1, 1, 25)
+plt.hist( Lz[inds]/Ls[inds], bins,  alpha=0.8, label="Final Distribution")
+
+plt.legend(loc='best')
+
+plt.xlabel(r"$L_z/L$")
+plt.ylabel(r"Counts")
+
+plt.savefig("../plots/Lz_distribution.pdf", bbox_inches='tight')
+
+plt.show()
 
 if (MAKE_PLOTS): 
     plt.figure()

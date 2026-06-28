@@ -122,7 +122,7 @@ def save_density(N):
     rholist_full = orbits.reconstruct_density_full(rlist, Es, Ls, weights, m1)
     rholist_full_free = orbits.reconstruct_density_full(rlist, Es, Ls, weights_lc, m1)
     hdrtxt = "Columns: r [pc], rho [Msun/pc**3], rho/rho_i, rho (uncaptured) [Msun/pc**3], rho (uncaptured)/rho_i"
-    np.savetxt(datapath + f"Density_{fstr}_Norb_" + str(int(N)) + ".txt", np.column_stack((rlist/u.pc, rholist_full/(u.Msun/u.pc**3), rholist_full/rholist_i), rholist_full_free/(u.Msun/u.pc**3), rholist_full_free/rholist_i_free), header=hdrtxt)
+    np.savetxt(datapath + f"Density_{fstr}_Norb_" + str(int(N)) + ".txt", np.column_stack((rlist/u.pc, rholist_full/(u.Msun/u.pc**3), rholist_full/rholist_i, rholist_full_free/(u.Msun/u.pc**3), rholist_full_free/rholist_i_free)), header=hdrtxt)
 
 def save_orbits(N):
     hdrtxt = "Columns: E [(km/s)^2], L [pc (km/s)], Lz [pc (km/s)], w [Msun], w (uncaptured) [Msun]"
@@ -249,7 +249,7 @@ for i in tqdm(range(Norb)):
         E_tot = np.array(E_tot)
         E_tot_free = np.array(E_tot_free)
         
-        np.savetxt(datapath + f"Etot_MC_{IDstr}_Norb_" + str(int(Norb)) + ".txt", np.column_stack((N_list, E_tot/(u.Msun*(u.km/u.s)**2), E_tot_free/(u.Msun*(u.km/u.s)**2))))
+        np.savetxt(datapath + f"Etot_MC_{fstr}.txt", np.column_stack((N_list, E_tot/(u.Msun*(u.km/u.s)**2), E_tot_free/(u.Msun*(u.km/u.s)**2))))
         
         break
 
