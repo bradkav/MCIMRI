@@ -139,6 +139,7 @@ def make_plot(N):
 
     plt.savefig(plotpath + f"InspiralDepletion_{fstr}_Norb_{int(N)}.pdf", bbox_inches='tight')
 
+
 def save_density(N):
     rholist_full = orbits.reconstruct_density_full(rlist, Es, Ls, weights, m1)
     rholist_full_free = orbits.reconstruct_density_full(rlist, Es, Ls, weights_lc, m1)
@@ -146,6 +147,7 @@ def save_density(N):
     
     with np.errstate(divide='ignore', invalid='ignore'):
         np.savetxt(datapath + f"Density_{fstr}_Norb_" + str(int(N)) + ".txt.gz", np.column_stack((rlist/u.pc, rholist_full/(u.Msun/u.pc**3), rholist_full/rholist_i, rholist_full_free/(u.Msun/u.pc**3), rholist_full_free/rholist_i_free)), header=hdrtxt, fmt='%.5e')
+
 
 def save_orbits(N):
     hdrtxt = "Columns: E [(km/s)^2], L [pc (km/s)], Lz [pc (km/s)], w [Msun], w (uncaptured) [Msun]"
