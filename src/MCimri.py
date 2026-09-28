@@ -19,13 +19,24 @@ import orbits
 #################
 ##### FLAGS #####
 #################
-RESAMPLE_B = False
-DO_INNER   = True
-SIMULTANEOUS = False
-DO_RESONANCES = False
+RESAMPLE_B          = False
+DO_INNER            = True
+DO_VELOCITY_3BODY   = False
+SIMULTANEOUS        = False
+DO_RESONANCES       = False
 
 
-def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3body=True, include_resonance=True, elements="ELLz"):
+"""
+BJK - Things to try (July 2026):
+    - check what happens on a timescale of 1 orbit!
+    - understand which particles are causing the problem? Small relative velocity?
+    - introduce softening to fix it?
+    - check normalisation of initial DF (what is C_DF)
+    - Is there an initial hyper transient phase which is messing things up?
+    - Compare with C_DF estimates from Francesca
+"""
+
+def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3body=True, elements="ELLz"):
     
     N = len(Es)
     
@@ -38,6 +49,7 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
     
     #----------------
     b_max = 0.3*r_orb
+    #b_max = np.sqrt(m2/m1)*r_orb
     r_min = 1e-9*u.pc
     
     r_min_stir = r_orb# + b_max
@@ -75,12 +87,50 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
     vorb_y = v_orb*np.cos(phi_orb)
     vorb_z = 0.0*phi_orb
     
+    dv = np.sqrt( (vx - vorb_x)**2 + (vy - vorb_y)**2 + (vz - vorb_z)**2 )
+    
+    
+    v_circ = (vx*vorb_x + vy*vorb_y + vz*vorb_z)/v_orb
+    #This is a kind of weird definition of v_rel, as it always points tangentially...
+    
+    #BJK - old definition
+    #v_rel_x = (v_orb - v_circ)*vorb_x/v_orb
+    #v_rel_y = (v_orb - v_circ)*vorb_y/v_orb
+    #v_rel_z = (v_orb - v_circ)*vorb_z/v_orb
+    
+    #v_circ_rel = v_orb - v_circ
+    
+    p_scat = np.clip(1 - v_circ/v_orb, 0, 1)
+    #print(p_scat.shape)
+    
+    #BJK - new definition...
+    v_rel_x = vorb_x - vx
+    v_rel_y = vorb_y - vy
+    v_rel_z = vorb_z - vz
+    
+    #General definition!
+    v_rel = np.sqrt(v_rel_x**2 + v_rel_y**2 + v_rel_z**2)
+    
+    #BJK - old good definition
     dx = x0 - x_orb
     dy = y0 - y_orb
     dz = z0 - z_orb
     
-    v_circ = (vx*vorb_x + vy*vorb_y + vz*vorb_z)/v_orb
-    v_circ2 = (vx*vorb_x + vy*vorb_y + vz*vorb_z)/vs
+    #BJK - new definition?
+    dr_dot_vrel = dx*v_rel_x/v_rel + dy*v_rel_y/v_rel + dz*v_rel_z/v_rel
+    
+    b_x = dx - dr_dot_vrel*v_rel_x/v_rel
+    b_y = dy - dr_dot_vrel*v_rel_y/v_rel
+    b_z = dz - dr_dot_vrel*v_rel_z/v_rel
+    
+    
+    #print("Penalise encounters with |v_orb - v_circ| < v_orb, or equivalently v_circ > 0!!! That is, include a probability which scales like np.clip(-v_circ/v_orb, 0, 1)...")
+    
+    #v_circ2 = (vx*vorb_x + vy*vorb_y + vz*vorb_z)/vs
+    
+    #plt.figure()
+    #plt.hist(mu_i) 
+    #plt.show()
     
     #v_rel = -v_circ2
     #v_rel = np.sign(v_circ)*np.sqrt((vorb_x - vx)**2 + (vorb_y - vy)**2 + (vorb_z - vz)**2)
@@ -89,18 +139,54 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
     #vr_y = v_orb - vy
     #vr_z = v_orb - vz
     
-    v_rel = (v_orb - v_circ)
+
     #v_rel = np.ones(N)*v_orb
+
+    #corr = (v_orb**2/dv**3)*v_rel*np.abs(v_rel/v_orb)
+    #corr = np.sign(v_rel)*v_orb**2/v_rel**2
+
+    #corr = vs < v_orb
+
+    #N_full = 50_000
+    #eps = 3*v_orb*N**(-1/3)
+    eps = 0
+    #eps = np.sort(dv)[9] + 1
+    #print(eps/v_orb)
+    #print(np.min(dv), eps)
+    #print(np.sum(dv < eps))
+    #plt.figure()
+    
+    #plt.hist(dv/v_orb, np.linspace(0, 4, 100))
+    
+    #plt.axvline(eps/v_orb, linestyle='--', color='k')
+    
+    #plt.show()
+    #assert 1 == 0
+    #assert 1 == 0
+    #eps = 0
+    
+    #print("<MCimri.py> Currently applying some kind of strange correction!")
+    #BJK: See also further down when I define dv_para and dv_perp...
+    #dv_soft = np.sqrt(dv**2 + eps**2)
+    #This probably doesn't work very well for co-rotating orbits!
+    #corr = (v_orb**2/dv_soft**2)*(v_rel/dv_soft)
+    
+    #BJK: Depending on whether we fix b_90 = G M2/v_orb^2 or not..
+    #corr = (dv**2/v_orb**2)*(v_rel/dv)
+    corr = v_rel*0.0 + 1.0 
 
     #BJK: Perhaps apply a scattering probability which goes like v_t/v_circ... the kicks shouldn't depend on v_rel...
 
-    bs0 = np.sqrt((x0 - x_orb)**2 + (y0 - y_orb)**2 + (z0 - z_orb)**2)
+    bs0 = np.sqrt(b_x**2 + b_y**2 + b_z**2)
     
-    b90  = np.ones(N)*u.G_N*m2/((v_orb)**2)
-    #b90 = u.G_N*m2/((v_rel)**2)
+    #b90  = np.ones(N)*u.G_N*m2/((v_orb)**2)
+    #b90 = np.ones(N)*u.G_N*m2/((dv)**2)
+    b90 = u.G_N*m2/((v_rel)**2)
     bs = 1.0*bs0
 
-    b_min = r_min*np.sqrt(1 + 2*b90/r_min)
+    b_min = r_min
+    #b_min = r_min*np.sqrt(1 + 2*b90/r_min)
+    #print(b_min/r_min)
     
     dE = 0.0*Es
     dL = 0.0*Es
@@ -150,8 +236,8 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
         #print("2:1 fraction:", np.sum(res_21)/N)
         #print("1:2 fraction:", np.sum(res_12)/N)
 
-        #protected = horseshoes | trojans | res_21 | res_12
-        protected = res_21 #s| res_12
+        protected = horseshoes | trojans | res_21 | res_12
+        #protected = res_21 #s| res_12
 
     mask_DF = bs < 0
     if (include_DF):
@@ -166,14 +252,22 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
         scatter = 1.0
         
         #p0 = 0.1
-        #scatter = np.random.choice(np.array([0, 1]), size=N_DF, replace=True, p = [1-p0, p0])
+        
         
         if (N_DF > 0):
+            #BJK!
+            #p0 = p_scat
+            _x = np.random.rand(N_DF)
+            scatter = _x > p_scat[mask_DF]
+            #scatter = np.random.choice(np.array([0, 1]), size=N_DF, replace=True, p = [1-p0, p0])
             
             if (RESAMPLE_B):
                 b_new = b_max*np.sqrt(np.random.rand(N_DF))
             else:
                 b_new = bs[mask_DF]
+
+            #dv_para = 2*v_orb*(1 + b_new**2/b90[mask_DF]**2)**(-1) 
+            #dv_perp = -2*v_orb*(b_new/b90[mask_DF])*(1 + b_new**2/b90[mask_DF]**2)**(-1) 
                         
             dv_para = 2*v_rel[mask_DF]*(1 + b_new**2/b90[mask_DF]**2)**(-1) 
             dv_perp = -2*v_rel[mask_DF]*(b_new/b90[mask_DF])*(1 + b_new**2/b90[mask_DF]**2)**(-1) 
@@ -181,9 +275,13 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
             dv_para *= scatter
             dv_perp *= scatter
             
-            dv_x[mask_DF] += dv_para*vorb_x[mask_DF]/v_orb + dv_perp*dx[mask_DF]/bs[mask_DF]
-            dv_y[mask_DF] += dv_para*vorb_y[mask_DF]/v_orb + dv_perp*dy[mask_DF]/bs[mask_DF]
-            dv_z[mask_DF] += dv_para*vorb_z[mask_DF]/v_orb + dv_perp*dz[mask_DF]/bs[mask_DF]
+            dv_para *= corr[mask_DF]
+            dv_perp *= corr[mask_DF]
+            
+            
+            dv_x[mask_DF] += dv_para*v_rel_x[mask_DF]/v_rel[mask_DF] + dv_perp*b_x[mask_DF]/bs[mask_DF]
+            dv_y[mask_DF] += dv_para*v_rel_y[mask_DF]/v_rel[mask_DF] + dv_perp*b_y[mask_DF]/bs[mask_DF]
+            dv_z[mask_DF] += dv_para*v_rel_z[mask_DF]/v_rel[mask_DF] + dv_perp*b_z[mask_DF]/bs[mask_DF]
                     
     if (include_3body):
         
@@ -264,49 +362,50 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
         #dv_y[mask_3b] += norm*3*(H/16) * (mu*(20*cos(3*ph0)*sin(th0)**3 + cos(ph0)*(sin(th0) + 5*sin(3*th0))) - 4*np.pi*mu*(sin(th0) + 5*sin(3*th0))*sin(ph0))
         #dv_z[mask_3b] += norm*3*cos(th0)*(H/4) * (-2*np.pi*mu*(-1 + 5*cos(2*th0)) - 10*mu*sin(th0)**2*sin(2*ph0))
 
-        sθ, cθ = np.sin(th0), np.cos(th0)
-        sφ, cφ = np.sin(ph0), np.cos(ph0)
+        if (DO_VELOCITY_3BODY):
+            sθ, cθ = np.sin(th0), np.cos(th0)
+            sφ, cφ = np.sin(ph0), np.cos(ph0)
 
-        sθv, cθv = np.sin(thv), np.cos(thv)
-        sφv, cφv = np.sin(phv), np.cos(phv)
+            sθv, cθv = np.sin(thv), np.cos(thv)
+            sφv, cφv = np.sin(phv), np.cos(phv)
 
-        s3θ = np.sin(3*th0)
+            s3θ = np.sin(3*th0)
         
-        #H = np.clip(v0*Torb/(2*np.pi*r0), 0, 1.0)
-        H = v0*Torb/(2*np.pi*r0)
-        #H = 0.0
+            #H = np.clip(v0*Torb/(2*np.pi*r0), 0, 1.0)
+            H = v0*Torb/(2*np.pi*r0)
+            #H = 0.0
 
-        dv_x[mask_3b] += (H/8) * (
-            -120*np.pi*mu*(cφ**2)*(sθ**3)*sφ
-            + 2*np.pi*(12*mu*sθ*sφ + sθv*(np.cos(phv)*(6*np.pi + 4*sθ*sφ) - 3*sφv))
-            + cφ * (
-                -6*np.pi*mu*(sθ + 5*s3θ)
-                + sθ*sθv*(128*sφv - 30*sθ*(-2*np.pi*np.cos(ph0 - phv) + np.sin(ph0 + phv)))
+            dv_x[mask_3b] += (H/8) * (
+                -120*np.pi*mu*(cφ**2)*(sθ**3)*sφ
+                + 2*np.pi*(12*mu*sθ*sφ + sθv*(np.cos(phv)*(6*np.pi + 4*sθ*sφ) - 3*sφv))
+                + cφ * (
+                    -6*np.pi*mu*(sθ + 5*s3θ)
+                    + sθ*sθv*(128*sφv - 30*sθ*(-2*np.pi*np.cos(ph0 - phv) + np.sin(ph0 + phv)))
+                )
             )
-        )
 
 
-        dv_y[mask_3b] += (H/4) * (
-            -3*np.pi*mu*(sθ + 5*s3θ)*sφ
-            + 4*cφ*sθ*(np.cos(phv)*sθv + 3*mu*(1 - 5*sθ**2*sφ**2))
-            + sθv * (
-                -3*np.cos(phv)
-                + 30*np.pi*np.cos(ph0 - phv)*sθ**2*sφ
-                + 6*np.pi*np.sin(phv)
-                + 68*sθ*sφ*np.sin(phv)
-                - 15*sθ**2*sφ*np.sin(ph0 + phv)
+            dv_y[mask_3b] += (H/4) * (
+                -3*np.pi*mu*(sθ + 5*s3θ)*sφ
+                + 4*cφ*sθ*(np.cos(phv)*sθv + 3*mu*(1 - 5*sθ**2*sφ**2))
+                + sθv * (
+                    -3*np.cos(phv)
+                    + 30*np.pi*np.cos(ph0 - phv)*sθ**2*sφ
+                    + 6*np.pi*np.sin(phv)
+                    + 68*sθ*sφ*np.sin(phv)
+                    - 15*sθ**2*sφ*np.sin(ph0 + phv)
+                )
             )
-        )
 
 
-        dv_z[mask_3b] += (3*H*cθ/4) * (
-            -8*np.pi*mu
-            + 5 * (
-                4*mu*sθ**2*(np.pi - cφ*sφ)
-                + 4*sθv*np.sin(phv)
-                - sθ*sθv*(-2*np.pi*np.cos(ph0 - phv) + np.sin(ph0 + phv))
+            dv_z[mask_3b] += (3*H*cθ/4) * (
+                -8*np.pi*mu
+                + 5 * (
+                    4*mu*sθ**2*(np.pi - cφ*sφ)
+                    + 4*sθv*np.sin(phv)
+                    - sθ*sθv*(-2*np.pi*np.cos(ph0 - phv) + np.sin(ph0 + phv))
+                )
             )
-        )
 
         #Hexadecapole
         #dv_x[mask_3b] += norm2*(45/512)*(r_orb/r0)**4*(15 + 28*cos(2*th0) + 21*cos(4*th0))*xhat
