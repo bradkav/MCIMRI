@@ -169,9 +169,10 @@ class TimeSeries:
         self.E_tot_free = None
         self.rho_r      = None
         self.rho_r_free = None
+        self.frac_ej    = None
         
     def calc_E_tot(self, E, w):
-        return np.sum(E*w)
+        return np.sum(np.nan_to_num(E)*w)
         
     def calc_rho_r(self, r, E, L, w):
         return orbits.reconstruct_density_full(np.array([r,]), E, L, w, self.m1)[0]
@@ -193,6 +194,8 @@ class TimeSeries:
         
             self.rho_r = [rho_r]
             self.rho_r_free = [rho_r_free]
+
+            self.frac_ej = [np.sum(Es < 0)/len(Es)]
         else:
             self.Ns.append(N)
             self.rs.append(r)
@@ -202,6 +205,8 @@ class TimeSeries:
         
             self.rho_r.append(rho_r)
             self.rho_r_free.append(rho_r_free)
+
+            self.frac_ej.append(np.sum(Es < 0)/len(Es))
         
     def save(self, datapath, fstr):
         N_arr = np.array(self.Ns)
@@ -211,11 +216,13 @@ class TimeSeries:
         E_free_arr = np.array(self.E_tot_free)
         rho_r_arr = np.array(self.rho_r)
         rho_r_free_arr = np.array(self.rho_r_free)
+
+        frac_ej_arr = np.array(self.frac_ej)
         
         hdrtxt = "Columns: N_orbs, Total DM energy (no capture) [Msun (km/s)^2], Total DM energy (including capture) [Msun (km/s)^2]"
         np.savetxt(datapath + f"Etot_{fstr}.txt.gz", np.column_stack((N_arr, E_arr/(u.Msun*(u.km/u.s)**2), E_free_arr/(u.Msun*(u.km/u.s)**2))), header=hdrtxt, fmt='%.5e')
         
-        hdrtxt = "Columns: N_orbs, r_2 [pc], rho(r_2), no capture [Msun/pc**3], rho(r_2), including capture [Msun/pc**3]"
-        np.savetxt(datapath + f"Density_r_{fstr}.txt.gz", np.column_stack((N_arr, r_arr/u.pc, rho_r_arr/(u.Msun/u.pc**3), rho_r_free_arr/(u.Msun/u.pc**3))), header=hdrtxt, fmt='%.5e')
+        hdrtxt = "Columns: N_orbs, r_2 [pc], rho(r_2), no capture [Msun/pc**3], rho(r_2), including capture [Msun/pc**3], Ejected fraction"
+        np.savetxt(datapath + f"Density_r_{fstr}.txt.gz", np.column_stack((N_arr, r_arr/u.pc, rho_r_arr/(u.Msun/u.pc**3), rho_r_free_arr/(u.Msun/u.pc**3), frac_ej_arr)), header=hdrtxt, fmt='%.5e')
 
 

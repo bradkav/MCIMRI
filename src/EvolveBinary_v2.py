@@ -24,12 +24,12 @@ import sys
 
 # Flags and parameters
 #---------------------
-INCLUDE_DF = True
-INCLUDE_3BODY = True
+ 
 DYNAMIC = True
 SAVE_ORBITS = False
+MAKE_PLOTS = False
+SAVE_PROFILES = False
 
-N_particles = 2000
 dN = 1
 
 #####################
@@ -42,6 +42,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-rank", type=int)
 parser.add_argument("-logm1", type=float, default = np.log10(4e6))
 parser.add_argument("-logm2", type=float, default = 4)
+parser.add_argument("-mode", type=str, default="Full")
 
 group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument('-rS', type = float)
@@ -53,11 +54,39 @@ args = parser.parse_args()
 rank = int(args.rank)
 print("rank:", rank)
 
+#Flags
+#-------------------------
+mode = args.mode
+
+INCLUDE_DF = True
+INCLUDE_3BODY = True
+EJECTING_ONLY = False
+
+if (mode == "EjOnly"):
+    EJECTING_ONLY = True
+elif (mode == "NoStir"):
+    INCLUDE_3BODY = False
+elif (mode == "NoInner"):
+    MCimri.DO_INNER = False
+elif (mode == "NoVel"):
+    MCimri.DO_VELOCITY_3BODY = False
+elif (mode == "NoInnerNoVel"):
+    MCimri.DO_VELOCITY_3BODY = False
+    MCimri.DO_INNER = False
+
 #Specify the binary system
 #-------------------------
 m1 = (10**args.logm1)*u.Msun
 m2 = (10**args.logm2)*u.Msun
 
+q = m2/m1
+
+N_particles = 10_000
+#N_particles = 100
+
+#if (q < 2e-2):
+#    N_particles = 50000
+    
 binary = binaries.CircularBinary(m1, m2)
 r_isco = binary.r_isco
 
@@ -81,7 +110,7 @@ if (dN > 1):
     dN_str = f"_dN_{str(int(dN))}"
 
 
-froot = f"logM1_{np.log10(m1/u.Msun):.2f}_logM2_{np.log10(m2/u.Msun):.2f}_{rstr}{dN_str}"
+froot = f"logM1_{np.log10(m1/u.Msun):.2f}_logM2_{np.log10(m2/u.Msun):.2f}_PBH_{mode}_{rstr}{dN_str}_TEST"
 fstr = froot + "_" + str(int(rank))
 datapath = "../data/" + froot + "/" + fstr + "/"
 plotpath = "../plots/" + froot + "/" + fstr + "/"
@@ -90,6 +119,9 @@ Path(datapath).mkdir(parents=True, exist_ok=True)
 Path(plotpath).mkdir(parents=True, exist_ok=True)
 
 def make_plot(N):
+
+    if not (MAKE_PLOTS == True):
+        return -1
     
     rholist_full = orbits.reconstruct_density_full(rlist, Es, Ls, weights, m1)
     rholist_full_free = orbits.reconstruct_density_full(rlist, Es, Ls, weights_lc, m1)
@@ -159,7 +191,10 @@ def save_orbits(N):
 
 #Define the spike and sample the energies of N_particles particles (or rather, orbits), from P(E) = g(E)*d(E)
 #---------------------------
-SpikeDF = df.GeneralizedNFWSpike(m1, rho_6=1*u.Msun/u.pc**3, gamma_sp=7/3, r_t=20*a_i, alpha=2)
+rho_6_ref = 2.096865e-11*u.g/u.cm**3
+SpikeDF = df.GeneralizedNFWSpike(m1, rho_6=rho_6_ref, gamma_sp=9/4, r_t=20*a_i, alpha=2)
+#SpikeDF = df.GeneralizedNFWSpike(m1, rho_6=1*u.Msun/u.pc**3, gamma_sp=7/3, r_t=20*a_i, alpha=2)
+
 r_min = 0.1*r_isco
 r_max = 10000*a_i
 
@@ -199,8 +234,8 @@ Nsnaps_target = 200
 N_out = int(max(Nout_min, ((Norb/Nsnaps_target) // Nout_min) * Nout_min))
 
 #---------- FIXED
-Norb = 15000
-N_out = 100
+Norb = 30000
+N_out = 1
 
 
 Es = 1.0*Es_i
@@ -212,16 +247,24 @@ t = 0
 
 ts = utilities.TimeSeries(binary.m1)
 
-ts.add(0, Es, Ls, weights, weights_lc, r_orb)
+#ts.add(0, Es, Ls, weights, weights_lc, r_orb)
 
 for i in tqdm(range(Norb)):
+
+    if (i > 20):
+        N_out = 10
+    if (i > 100):
+        N_out = 100
+    if (i > 5000):
+        N_out = 1000
     
     if (i%N_out == 0):
-        print("Number of orbits, r/r_i:", i, r_orb/a_i)
+        #print("Number of orbits, r/r_i:", i, r_orb/a_i)
         
         ts.add(i, Es, Ls, weights, weights_lc, r_orb)
-        
-        save_density(i+offset)
+
+        if ((i == 0) or (SAVE_PROFILES == True)):
+            save_density(i+offset)
         make_plot(i+offset)
         if (SAVE_ORBITS): save_orbits(i+offset)
     
@@ -234,10 +277,36 @@ for i in tqdm(range(Norb)):
             
     if (i%dN == 0):
         dE, dL, dLz = MCimri.calculate_dE(Es[inds], Ls[inds], Lz[inds], binary, r_orb, mult = dN, include_DF=INCLUDE_DF, include_3body=INCLUDE_3BODY)
-    
-        Es[inds] += dE
-        Ls[inds] += dL
-        Lz[inds] += dLz
+
+        _dE  = np.nan_to_num(dE)
+        _dL  = np.nan_to_num(dL)
+        _dLz = np.nan_to_num(dLz)
+
+        # Work on subset
+        Es_sub = Es[inds]
+        Ls_sub = Ls[inds]
+        Lz_sub = Lz[inds]
+
+        # Trial values
+        Es_trial = Es_sub + _dE
+
+        if (EJECTING_ONLY):
+            mask = Es_trial < 0
+        else:
+            mask = np.abs(Es_trial) >= 0
+        #print("Ejected particles:", np.sum(mask)/N_particles)
+
+        if (np.sum(mask) > 0):
+            # Apply updates ONLY inside subset
+            Es_sub[mask] += _dE[mask]
+            Ls_sub[mask] += _dL[mask]
+            Lz_sub[mask] += _dLz[mask]
+
+            # Write back once
+            Es[inds] = Es_sub
+            Ls[inds] = Ls_sub
+            Lz[inds] = Lz_sub
+        
         
     weights_lc[Ls < L_lc] *= 0.0
         
@@ -257,6 +326,15 @@ for i in tqdm(range(Norb)):
         
         break
 
+if (r_orb > r_isco):
+    ts.add(i, Es, Ls, weights, weights_lc, r_orb)
+
+    save_density(i+offset)
+    make_plot(i+offset)
+    if (SAVE_ORBITS): save_orbits(i+offset)
+
+    ts.save(datapath, fstr)
+    
 #plt.show()
 #----------------
 

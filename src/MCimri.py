@@ -21,11 +21,14 @@ import orbits
 #################
 RESAMPLE_B = False
 DO_INNER   = True
+DO_VELOCITY_3BODY = True
 SIMULTANEOUS = False
 DO_RESONANCES = False
 
 
 def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3body=True, include_resonance=True, elements="ELLz"):
+
+    #print(DO_VELOCITY_3BODY, DO_INNER)
     
     N = len(Es)
     
@@ -37,7 +40,8 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
     m2 = binary.m2
     
     #----------------
-    b_max = 0.3*r_orb
+    #b_max = 0.3*r_orb
+    b_max = np.sqrt(m2/m1)*r_orb
     r_min = 1e-9*u.pc
     
     r_min_stir = r_orb# + b_max
@@ -264,49 +268,50 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
         #dv_y[mask_3b] += norm*3*(H/16) * (mu*(20*cos(3*ph0)*sin(th0)**3 + cos(ph0)*(sin(th0) + 5*sin(3*th0))) - 4*np.pi*mu*(sin(th0) + 5*sin(3*th0))*sin(ph0))
         #dv_z[mask_3b] += norm*3*cos(th0)*(H/4) * (-2*np.pi*mu*(-1 + 5*cos(2*th0)) - 10*mu*sin(th0)**2*sin(2*ph0))
 
-        sθ, cθ = np.sin(th0), np.cos(th0)
-        sφ, cφ = np.sin(ph0), np.cos(ph0)
+        if (DO_VELOCITY_3BODY):
+            sθ, cθ = np.sin(th0), np.cos(th0)
+            sφ, cφ = np.sin(ph0), np.cos(ph0)
 
-        sθv, cθv = np.sin(thv), np.cos(thv)
-        sφv, cφv = np.sin(phv), np.cos(phv)
+            sθv, cθv = np.sin(thv), np.cos(thv)
+            sφv, cφv = np.sin(phv), np.cos(phv)
 
-        s3θ = np.sin(3*th0)
+            s3θ = np.sin(3*th0)
         
-        #H = np.clip(v0*Torb/(2*np.pi*r0), 0, 1.0)
-        H = v0*Torb/(2*np.pi*r0)
-        #H = 0.0
+            #H = np.clip(v0*Torb/(2*np.pi*r0), 0, 1.0)
+            H = v0*Torb/(2*np.pi*r0)
+            #H = 0.0
 
-        dv_x[mask_3b] += (H/8) * (
-            -120*np.pi*mu*(cφ**2)*(sθ**3)*sφ
-            + 2*np.pi*(12*mu*sθ*sφ + sθv*(np.cos(phv)*(6*np.pi + 4*sθ*sφ) - 3*sφv))
-            + cφ * (
-                -6*np.pi*mu*(sθ + 5*s3θ)
-                + sθ*sθv*(128*sφv - 30*sθ*(-2*np.pi*np.cos(ph0 - phv) + np.sin(ph0 + phv)))
+            dv_x[mask_3b] += (H/8) * (
+                -120*np.pi*mu*(cφ**2)*(sθ**3)*sφ
+                + 2*np.pi*(12*mu*sθ*sφ + sθv*(np.cos(phv)*(6*np.pi + 4*sθ*sφ) - 3*sφv))
+                + cφ * (
+                    -6*np.pi*mu*(sθ + 5*s3θ)
+                    + sθ*sθv*(128*sφv - 30*sθ*(-2*np.pi*np.cos(ph0 - phv) + np.sin(ph0 + phv)))
+                   )
             )
-        )
 
 
-        dv_y[mask_3b] += (H/4) * (
-            -3*np.pi*mu*(sθ + 5*s3θ)*sφ
-            + 4*cφ*sθ*(np.cos(phv)*sθv + 3*mu*(1 - 5*sθ**2*sφ**2))
-            + sθv * (
-                -3*np.cos(phv)
-                + 30*np.pi*np.cos(ph0 - phv)*sθ**2*sφ
-                + 6*np.pi*np.sin(phv)
-                + 68*sθ*sφ*np.sin(phv)
-                - 15*sθ**2*sφ*np.sin(ph0 + phv)
+            dv_y[mask_3b] += (H/4) * (
+                -3*np.pi*mu*(sθ + 5*s3θ)*sφ
+                + 4*cφ*sθ*(np.cos(phv)*sθv + 3*mu*(1 - 5*sθ**2*sφ**2))
+                + sθv * (
+                    -3*np.cos(phv)
+                    + 30*np.pi*np.cos(ph0 - phv)*sθ**2*sφ
+                    + 6*np.pi*np.sin(phv)
+                    + 68*sθ*sφ*np.sin(phv)
+                    - 15*sθ**2*sφ*np.sin(ph0 + phv)
+                   )
             )
-        )
 
 
-        dv_z[mask_3b] += (3*H*cθ/4) * (
-            -8*np.pi*mu
-            + 5 * (
-                4*mu*sθ**2*(np.pi - cφ*sφ)
-                + 4*sθv*np.sin(phv)
-                - sθ*sθv*(-2*np.pi*np.cos(ph0 - phv) + np.sin(ph0 + phv))
+            dv_z[mask_3b] += (3*H*cθ/4) * (
+                 -8*np.pi*mu
+                + 5 * (
+                    4*mu*sθ**2*(np.pi - cφ*sφ)
+                    + 4*sθv*np.sin(phv)
+                    - sθ*sθv*(-2*np.pi*np.cos(ph0 - phv) + np.sin(ph0 + phv))
+                   )
             )
-        )
 
         #Hexadecapole
         #dv_x[mask_3b] += norm2*(45/512)*(r_orb/r0)**4*(15 + 28*cos(2*th0) + 21*cos(4*th0))*xhat

@@ -11,12 +11,17 @@ import binaries
 import orbits
 import utilities
 
+from pathlib import Path
+
 import matplotlib
 import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 18})
 
 import glob
 import re
+
+DO_DENSITY_PROFILES = False
+STITCH_ETEST = False
 
 #Command line arguments
 #----------------------
@@ -25,14 +30,17 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-rank", type=int)
 parser.add_argument("-logm1", type=float, default = np.log10(4e6))
 parser.add_argument("-logm2", type=float, default = 4)
+parser.add_argument("-mode", type=str, default="Full")
 
 group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument('-rS', type = float)
 group.add_argument('-pc', type = float)
 
 
+
 args = parser.parse_args()
 
+mode = args.mode
 
 #Specify the binary system
 #-------------------------
@@ -64,11 +72,13 @@ if (dN > 1):
     dN_str = f"_dN_{str(int(dN))}"
 
 
-froot = f"logM1_{np.log10(m1/u.Msun):.2f}_logM2_{np.log10(m2/u.Msun):.2f}_{rstr}{dN_str}"
+froot = f"logM1_{np.log10(m1/u.Msun):.2f}_logM2_{np.log10(m2/u.Msun):.2f}_PBH_{mode}_{rstr}{dN_str}"
 
-N_jobs = 3
+N_jobs = 32
 
 plotpath = "../plots/" + froot + "/"
+
+Path(plotpath).mkdir(parents=True, exist_ok=True)
 
 #--------------------------------------
 print("Stitching rho(r) files...")
@@ -87,22 +97,29 @@ for i in range(N_jobs):
         
         rho_full = data[:,2]*u.Msun/u.pc**3
         rho_full_free = data[:,3]*u.Msun/u.pc**3
+
+        f_ej     = data[:,4]
+
     else:
         rho_full += data[:,2]*u.Msun/u.pc**3
         rho_full_free += data[:,3]*u.Msun/u.pc**3
 
+        f_ej    += data[:,4]
+
 rho_full /= N_jobs
 rho_full_free /= N_jobs
 
-hdrtxt = "Columns: N_orbs, r_2 [pc], rho(r_2), no capture [Msun/pc**3], rho(r_2), including capture [Msun/pc**3]"
-np.savetxt("../data/" + froot + "/"  + f"Density_r_{froot}_all.txt", np.column_stack((Nlist, rlist/u.pc, rho_full/(u.Msun/u.pc**3), rho_full_free/(u.Msun/u.pc**3))), header=hdrtxt)
+f_ej    /= N_jobs
+
+hdrtxt = "Columns: N_orbs, r_2 [pc], rho(r_2), no capture [Msun/pc**3], rho(r_2), including capture [Msun/pc**3], f_ej"
+np.savetxt("../results/" + f"Density_r_{froot}_all.txt", np.column_stack((Nlist, rlist/u.pc, rho_full/(u.Msun/u.pc**3), rho_full_free/(u.Msun/u.pc**3), f_ej)), header=hdrtxt)
 
 plt.figure()
 
 plt.loglog(Nlist, rho_full/(u.Msun/u.pc**3))
 plt.loglog(Nlist, rho_full_free/(u.Msun/u.pc**3), linestyle='--')
 
-plt.savefig(f"../plots/" + froot + f"/Density_r_{froot}.pdf", bbox_inches='tight')
+plt.savefig(plotpath + f"/Density_r_{froot}.pdf", bbox_inches='tight')
 
 
 #--------------------------------------
@@ -111,7 +128,6 @@ for i in range(N_jobs):
     fstr = froot + "_" + str(int(i))
     datapath = "../data/" + froot + "/" + fstr + "/"
     
-
     ext = ".txt.gz"
     fname = "Etot_" + fstr + ext
     
@@ -130,8 +146,7 @@ Etot /= N_jobs
 Etot_free /= N_jobs
 
 hdrtxt = "Columns: N_orbs, Total DM energy (no capture) [Msun (km/s)^2], Total DM energy (including capture) [Msun (km/s)^2]"
-np.savetxt("../data/" + froot + "/" + f"Etot_{froot}_all.txt", np.column_stack((Nlist, rho_full, rho_full_free)), header=hdrtxt)
-
+np.savetxt("../results/" + f"Etot_{froot}_all.txt", np.column_stack((Nlist, Etot, Etot_free)), header=hdrtxt)
 
 
 plt.figure()
@@ -139,10 +154,42 @@ plt.figure()
 plt.loglog(Nlist, Etot)
 plt.loglog(Nlist, Etot_free, linestyle='--')
 
-plt.savefig(f"../plots/" + froot + f"/Etot_{froot}.pdf", bbox_inches='tight')
+plt.savefig(plotpath + f"/Etot_{froot}.pdf", bbox_inches='tight')
 
 
+#---------------------------------------
 
+if (STITCH_ETEST):
+    print("Stitching E_test files...")
+    for i in range(N_jobs):
+        fstr = froot + "_" + str(int(i))
+        datapath = "../data/" + froot + "/" + fstr + "/"
+
+
+        ext = ".txt.gz"
+        fname = "Etest_" + fstr + ext
+
+
+        data = np.loadtxt(datapath + fname)
+
+        if i == 0:
+            Etest = data
+        else:
+            Etest += data
+
+    Etest /= N_jobs
+
+    hdrtxt = "Columns: N_orbs, Total energy transfer (including all processes) [Msun (km/s)^2]"
+    np.savetxt("../results/" + f"Etest_{froot}_all.txt", np.column_stack((Nlist, Etest)), header=hdrtxt)
+ 
+
+#------------------------------------
+if (DO_DENSITY_PROFILES == False):
+    import sys
+    sys.exit()
+
+
+    
 #--------------------------------------
 print("Stitching density profile files...")
 
@@ -184,6 +231,7 @@ while RUNNING:
             rho_ratio = data[:,2]
             rho_full_free = data[:,3]*u.Msun/u.pc**3
             rho_ratio_free = data[:,4]
+            
         else:
             rho_full += data[:,1]*u.Msun/u.pc**3
             rho_ratio += data[:,2]
@@ -195,6 +243,8 @@ while RUNNING:
 
     rho_full_free /= N_jobs
     rho_ratio_free /= N_jobs
+
+    f_ej /= N_jobs
 
     hdrtxt = "Columns: r [pc], rho [Msun/pc**3], rho/rho_i, rho (uncaptured) [Msun/pc**3], rho/rho_i (uncaptured)"
     np.savetxt("../data/" + froot + "/" + f"Density_{froot}_all_Norb_{str(n_j)}.txt", np.column_stack((rlist/u.pc, rho_full/(u.Msun/u.pc**3), rho_ratio, rho_full_free/(u.Msun/u.pc**3), rho_ratio_free)), header=hdrtxt)
@@ -249,10 +299,10 @@ plt.legend(loc='best', fontsize=12)
 m1str =  utilities.to_scientific(m1/u.Msun)
 m2str = utilities.to_scientific(m2/u.Msun)
 
-plt.title(r"$(m_1, m_2) = (" + m1str + ", " + m2str + ")\,M_\odot$")
+plt.title(r"$(m_1, m_2) = (" + m1str + ", " + m2str + r")\,M_\odot$")
 #plt.legend(loc='upper right')
 
-plt.savefig(f"../plots/" + froot + f"/FinalDensity_{froot}.pdf", bbox_inches='tight')
+plt.savefig(plotpath + f"/FinalDensity_{froot}.pdf", bbox_inches='tight')
 
 print("DONE!")
 
