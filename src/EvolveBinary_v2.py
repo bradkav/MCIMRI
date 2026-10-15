@@ -63,6 +63,7 @@ INCLUDE_3BODY = True
 EJECTING_ONLY = False
 
 if (mode == "EjOnly"):
+    INCLUDE_3BODY = False
     EJECTING_ONLY = True
 elif (mode == "NoStir"):
     INCLUDE_3BODY = False
@@ -81,12 +82,15 @@ m2 = (10**args.logm2)*u.Msun
 
 q = m2/m1
 
-N_particles = 10_000
+N_particles = 40_000
+#N_particles = 5_000
 #N_particles = 100
 
 #if (q < 2e-2):
-#    N_particles = 50000
-    
+#    N_particles = 2_000
+
+r_soft = 1e-9*u.pc
+
 binary = binaries.CircularBinary(m1, m2)
 r_isco = binary.r_isco
 
@@ -110,7 +114,7 @@ if (dN > 1):
     dN_str = f"_dN_{str(int(dN))}"
 
 
-froot = f"logM1_{np.log10(m1/u.Msun):.2f}_logM2_{np.log10(m2/u.Msun):.2f}_PBH_{mode}_{rstr}{dN_str}_TEST"
+froot = f"logM1_{np.log10(m1/u.Msun):.2f}_logM2_{np.log10(m2/u.Msun):.2f}_PBH_{mode}_{rstr}{dN_str}_Oct26_longfix"
 fstr = froot + "_" + str(int(rank))
 datapath = "../data/" + froot + "/" + fstr + "/"
 plotpath = "../plots/" + froot + "/" + fstr + "/"
@@ -234,7 +238,7 @@ Nsnaps_target = 200
 N_out = int(max(Nout_min, ((Norb/Nsnaps_target) // Nout_min) * Nout_min))
 
 #---------- FIXED
-Norb = 30000
+Norb = 100_000
 N_out = 1
 
 
@@ -253,11 +257,20 @@ for i in tqdm(range(Norb)):
 
     if (i > 20):
         N_out = 10
-    if (i > 100):
+    if (i > 200):
         N_out = 100
-    if (i > 5000):
+    if (i > 2000):
         N_out = 1000
-    
+    if (i > 20_000):
+        N_out = 10_000
+    if (i > 200_000):
+        N_out = 100_000
+
+    #N_out = 1000
+        
+    if (i%25_000 == 0):
+        print("Number of orbits completed:", i)
+        
     if (i%N_out == 0):
         #print("Number of orbits, r/r_i:", i, r_orb/a_i)
         
@@ -276,8 +289,9 @@ for i in tqdm(range(Norb)):
             print(np.sum(L_out))
             
     if (i%dN == 0):
-        dE, dL, dLz = MCimri.calculate_dE(Es[inds], Ls[inds], Lz[inds], binary, r_orb, mult = dN, include_DF=INCLUDE_DF, include_3body=INCLUDE_3BODY)
+        dE, dL, dLz = MCimri.calculate_dE(Es[inds], Ls[inds], Lz[inds], binary, r_orb, mult = dN, include_DF=INCLUDE_DF, include_3body=INCLUDE_3BODY, r_min = r_soft)
 
+        #print(np.sum(np.isnan(dE)))
         _dE  = np.nan_to_num(dE)
         _dL  = np.nan_to_num(dL)
         _dLz = np.nan_to_num(dLz)
@@ -292,6 +306,7 @@ for i in tqdm(range(Norb)):
 
         if (EJECTING_ONLY):
             mask = Es_trial < 0
+            #print(np.sum(mask)/N_particles)
         else:
             mask = np.abs(Es_trial) >= 0
         #print("Ejected particles:", np.sum(mask)/N_particles)

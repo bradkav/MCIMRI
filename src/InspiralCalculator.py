@@ -29,8 +29,6 @@ args = parser.parse_args()
 m1 = args.m1*u.Msun
 m2 = args.m2*u.Msun
 
-
-
 #Specify the binary system
 
 binary = binaries.CircularBinary(m1, m2)
@@ -48,7 +46,8 @@ print(f"r = {r/rS:.2e} rS = {r/binary.r_isco:.2e} r_isco = {r/u.pc:.2e} pc")
 print(f"T_orb_i = {T_i/u.s} s")
 
 #N_per_min = 26_000  #1000 particles per sim
-N_per_min  = 18_500  #2000 particles per sim
+#N_per_min  = 11_000  #2000 particles per sim
+N_per_min  = 6_000   #5000 particles per sim
 
 N = binary.Norb_to_merger(r)
 

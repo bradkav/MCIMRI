@@ -110,7 +110,8 @@ def sample_phase_space_coordinates(Es, Ls, Lz, m1):
     inward = np.random.choice(np.array([-1, 1]), size=N, replace=True)
     
     vt = Ls/rs
-    vr = inward*np.sqrt(vs**2 - vt**2)
+    vr_sq = vs**2 - vt**2
+    vr = inward*np.sqrt(np.clip(vr_sq, 0, None))
     
     vt_x, vt_y, vt_z = utilities.full_cross(Lhat_x, Lhat_y, Lhat_z, rhatx, rhaty, rhatz)
     
