@@ -46,8 +46,8 @@ print(f"r = {r/rS:.2e} rS = {r/binary.r_isco:.2e} r_isco = {r/u.pc:.2e} pc")
 print(f"T_orb_i = {T_i/u.s} s")
 
 #N_per_min = 26_000  #1000 particles per sim
-#N_per_min  = 11_000  #2000 particles per sim
-N_per_min  = 6_000   #5000 particles per sim
+N_per_min  = 11_000  #2000 particles per sim
+#N_per_min  = 6_000   #5000 particles per sim
 
 N = binary.Norb_to_merger(r)
 

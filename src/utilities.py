@@ -157,7 +157,14 @@ def get_random_direction(N=1):
     theta = np.arccos(2*np.random.rand(N)-1)
     phi = 2*np.pi*np.random.rand(N)
     return theta, phi
-    
+
+def get_random_unitvector(N=1):
+    theta, phi = get_random_direction(N)
+    x = np.sin(theta)*np.cos(phi)
+    y = np.sin(theta)*np.sin(phi)
+    z = np.cos(theta)
+    return x, y, z
+
     
 class TimeSeries:
     def __init__(self, m1):
@@ -178,10 +185,11 @@ class TimeSeries:
     def calc_rho_r(self, r, E, L, w):
         return orbits.reconstruct_density_full(np.array([r,]), E, L, w, self.m1)[0]
 
-    def add(self, N, Es, Ls, w, w_c, r):
+    def add(self, N, Es, Ls, w, w_c, r, E_uncap):
         
         Etot = self.calc_E_tot(Es, w)
-        Etot_free = self.calc_E_tot(Es, w_c)
+        #Etot_free = self.calc_E_tot(Es, w_c)
+        Etot_free = E_uncap
         
         rho_r = self.calc_rho_r(r, Es, Ls, w)
         rho_r_free = self.calc_rho_r(r, Es, Ls, w_c)

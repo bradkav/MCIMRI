@@ -15,27 +15,17 @@ from NbodyIMRI import tools
 
 import binaries
 import orbits
+import utilities
 
 #################
 ##### FLAGS #####
 #################
 RESAMPLE_B          = False
 DO_INNER            = True
-DO_VELOCITY_3BODY   = False
 SIMULTANEOUS        = False
 DO_RESONANCES       = False
 DO_CAPTURE          = False
 
-
-"""
-BJK - Things to try (July 2026):
-    - check what happens on a timescale of 1 orbit!
-    - understand which particles are causing the problem? Small relative velocity?
-    - introduce softening to fix it?
-    - check normalisation of initial DF (what is C_DF)
-    - Is there an initial hyper transient phase which is messing things up?
-    - Compare with C_DF estimates from Francesca
-"""
 
 def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3body=True, elements="ELLz", r_min = 1e-9*u.pc):
     
@@ -93,21 +83,9 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
     v_orb_DM = np.sqrt(u.G_N*m1/rs)
     
     v_circ = (vx*vorb_x + vy*vorb_y + vz*vorb_z)/v_orb
-    #This is a kind of weird definition of v_rel, as it always points tangentially...
     
-    #BJK - old definition
-    #v_rel_x = (v_orb - v_circ)*vorb_x/v_orb
-    #v_rel_y = (v_orb - v_circ)*vorb_y/v_orb
-    #v_rel_z = (v_orb - v_circ)*vorb_z/v_orb
-    
-    #v_circ_rel = v_orb - v_circ
-
-    #BJK!
     p_scat = np.clip(np.abs(1 - v_circ/v_orb_DM), 0, 1)
 
-    
-    #p_scat = 0.0*v_circ + 1.0
-    #print(p_scat.shape)
     
     #BJK - new definition...
     v_rel_x = vorb_x - vx
@@ -117,8 +95,6 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
     #General definition!
     v_rel = np.sqrt(v_rel_x**2 + v_rel_y**2 + v_rel_z**2)
 
-    #p_scat = np.clip(v_rel/v_orb, 0, 1) 
-    
     #BJK - old good definition
     dx = x0 - x_orb
     dy = y0 - y_orb
@@ -130,64 +106,9 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
     b_x = dx - dr_dot_vrel*v_rel_x/v_rel
     b_y = dy - dr_dot_vrel*v_rel_y/v_rel
     b_z = dz - dr_dot_vrel*v_rel_z/v_rel
-    
-    
-    #print("Penalise encounters with |v_orb - v_circ| < v_orb, or equivalently v_circ > 0!!! That is, include a probability which scales like np.clip(-v_circ/v_orb, 0, 1)...")
-    
-    #v_circ2 = (vx*vorb_x + vy*vorb_y + vz*vorb_z)/vs
-    
-    #plt.figure()
-    #plt.hist(mu_i) 
-    #plt.show()
-    
-    #v_rel = -v_circ2
-    #v_rel = np.sign(v_circ)*np.sqrt((vorb_x - vx)**2 + (vorb_y - vy)**2 + (vorb_z - vz)**2)
-    
-    #vr_x = v_orb - vx
-    #vr_y = v_orb - vy
-    #vr_z = v_orb - vz
-    
-
-    #v_rel = np.ones(N)*v_orb
-
-    #corr = (v_orb**2/dv**3)*v_rel*np.abs(v_rel/v_orb)
-    #corr = np.sign(v_rel)*v_orb**2/v_rel**2
-
-    #corr = vs < v_orb
-
-    #N_full = 50_000
-    #eps = 3*v_orb*N**(-1/3)
-    eps = 0
-    #eps = np.sort(dv)[9] + 1
-    #print(eps/v_orb)
-    #print(np.min(dv), eps)
-    #print(np.sum(dv < eps))
-    #plt.figure()
-    
-    #plt.hist(dv/v_orb, np.linspace(0, 4, 100))
-    
-    #plt.axvline(eps/v_orb, linestyle='--', color='k')
-    
-    #plt.show()
-    #assert 1 == 0
-    #assert 1 == 0
-    #eps = 0
-    
-    #print("<MCimri.py> Currently applying some kind of strange correction!")
-    #BJK: See also further down when I define dv_para and dv_perp...
-    #dv_soft = np.sqrt(dv**2 + eps**2)
-    #This probably doesn't work very well for co-rotating orbits!
-    #corr = (v_orb**2/dv_soft**2)*(v_rel/dv_soft)
-    
-    #BJK: Depending on whether we fix b_90 = G M2/v_orb^2 or not..
-    #corr = (dv**2/v_orb**2)*(v_rel/dv)
-    corr = v_rel*0.0 + 1.0 
-
-    #BJK: Perhaps apply a scattering probability which goes like v_t/v_circ... the kicks shouldn't depend on v_rel...
 
     bs0 = np.sqrt(b_x**2 + b_y**2 + b_z**2)
-    
-    #b90  = np.ones(N)*u.G_N*m2/((v_orb)**2)
+
     #b90 = np.ones(N)*u.G_N*m2/((dv)**2)
     b90 = u.G_N*m2/((v_rel)**2)
     bs = 1.0*bs0
@@ -289,11 +210,7 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
             #dv_perp = -v_rel[mask_DF]*np.sin(chi)
             
             dv_para *= scatter
-            dv_perp *= scatter
-            
-            dv_para *= corr[mask_DF]
-            dv_perp *= corr[mask_DF]
-            
+            dv_perp *= scatter        
             
             dv_x[mask_DF] += dv_para*v_rel_x[mask_DF]/v_rel[mask_DF] + dv_perp*b_x[mask_DF]/bs[mask_DF]
             dv_y[mask_DF] += dv_para*v_rel_y[mask_DF]/v_rel[mask_DF] + dv_perp*b_y[mask_DF]/bs[mask_DF]
@@ -302,50 +219,24 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
     if (include_3body):
         
         if (DO_INNER):
+            a_DM = u.G_N*m1/(2*Es)
+            
             if (SIMULTANEOUS):
                 #mask_outer = (rs > r_min_stir) & (~protected)
-                mask_inner = (rs < r_max_stir) & (~protected)
+                mask_inner = (rs < r_max_stir) & (a_DM < r_orb) & (~protected)
             else:
                 #mask_outer = (rs > r_min_stir) & (~mask_DF) & (~protected)
-                mask_inner = (rs < r_max_stir) & (~mask_DF) & (~protected)
-        
-            #r0 = rs[mask_outer]
-            #th0 = theta0[mask_outer]
-            #ph0 = phi0[mask_outer]
-            #
-            #norm = -u.G_N*m2*Torb/r0**2
-            #
-            #xhat = sin(th0)*cos(ph0)
-            #yhat = sin(th0)*sin(ph0)
-            #zhat = cos(th0)
-            #
-            #dv_x[mask_outer] += norm*(-3/8)*(r/r0)**2*(3 + 5*cos(2*th0))*xhat
-            #dv_y[mask_outer] += norm*(-3/8)*(r/r0)**2*(3 + 5*cos(2*th0))*yhat
-            #dv_z[mask_outer] += norm*(+3/4)*(r/r0)**2*(-2 + 5*sin(th0)**2)*zhat
-            
-            r0 = rs[mask_inner]
-            th0 = theta0[mask_inner]
-            ph0 = phi0[mask_inner]
-            
-            norm2 = u.G_N*m2*Torb*r0/r_orb**3
+                mask_inner = (rs < r_max_stir) & (a_DM < r_orb) & (~mask_DF) & (~protected)
 
-            xhat = sin(th0)*cos(ph0)
-            yhat = sin(th0)*sin(ph0)
-            zhat = cos(th0)
+                
+            norm2 = (1/np.pi)*(u.G_N*m2*Torb*a_DM[mask_inner]/r_orb**3)*(a_DM[mask_inner]/r_orb)**(3/2)
 
-            #dv_x[mask_inner] += -norm2*(3/16)*(5*np.cos(th0)**2 - 3)*xhat
-            #dv_y[mask_inner] += -norm2*(3/16)*(5*np.cos(th0)**2 - 3)*yhat                                                                      
-            #dv_z[mask_inner] += norm2*(9/4)*(5*np.cos(th0)**2 - 2)*zhat   
-            
-            #dv_x[mask_inner] += -norm2*(1/32)*(r0/r_orb)**3*(27 + 45*cos(2*th0))*xhat
-            #dv_y[mask_inner] += -norm2*(1/32)*(r0/r_orb)**3*(27 + 45*cos(2*th0))*yhat
-            #dv_z[mask_inner] += norm2*(1/8)*(r0/r_orb)**3*(-3 + 15*cos(2*th0))*zhat
+            xhat, yhat, zhat = utilities.get_random_unitvector(len(norm2))
 
-            dv_x[mask_inner]  += norm2*(1/2)*xhat
-            dv_y[mask_inner]  += norm2*(1/2)*yhat
-            dv_z[mask_inner]  += -norm2*zhat
-            
-            
+            dv_x[mask_inner]  += norm2*xhat
+            dv_y[mask_inner]  += norm2*yhat
+            dv_z[mask_inner]  += norm2*zhat
+
         #Add shift due to 3 body effects
         if (SIMULTANEOUS):
             mask_3b = (rs > r_min_stir) & (~protected)
@@ -359,7 +250,7 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
         thv = theta[mask_3b]
         phv = phi[mask_3b]
 
-        norm = u.G_N*m2*Torb*r_orb**2/r0**4
+        #norm = u.G_N*m2*Torb*r_orb**2/r0**4
 
         xhat = sin(th0)*cos(ph0)
         yhat = sin(th0)*sin(ph0)
@@ -377,64 +268,6 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
         dv_x[mask_3b] += -norm*(3/4)*(1 - 5*np.cos(th0)**2)*xhat
         dv_y[mask_3b] += -norm*(3/4)*(1 - 5*np.cos(th0)**2)*yhat
         dv_z[mask_3b] += -norm*(3/4)*(3 - 5*np.cos(th0)**2)*zhat
-
-        #Quadrupole velocity term
-        #H = np.clip(v0*Torb/(2*np.pi*r0), 0, 0.1)
-        #H = v0*Torb/(2*np.pi*r0)
-        #print(np.sum(H > 1))
-        #dv_x[mask_3b] += norm*3*sin(th0)*(H/8) * ((3 + 5*cos(2*th0))*(-4*np.pi*mu*cos(ph0) + mu*sin(ph0)) - 10*mu*sin(th0)**2*sin(3*ph0))
-        #dv_y[mask_3b] += norm*3*(H/16) * (mu*(20*cos(3*ph0)*sin(th0)**3 + cos(ph0)*(sin(th0) + 5*sin(3*th0))) - 4*np.pi*mu*(sin(th0) + 5*sin(3*th0))*sin(ph0))
-        #dv_z[mask_3b] += norm*3*cos(th0)*(H/4) * (-2*np.pi*mu*(-1 + 5*cos(2*th0)) - 10*mu*sin(th0)**2*sin(2*ph0))
-
-        if (DO_VELOCITY_3BODY):
-            sθ, cθ = np.sin(th0), np.cos(th0)
-            sφ, cφ = np.sin(ph0), np.cos(ph0)
-
-            sθv, cθv = np.sin(thv), np.cos(thv)
-            sφv, cφv = np.sin(phv), np.cos(phv)
-
-            s3θ = np.sin(3*th0)
-        
-            #H = np.clip(v0*Torb/(2*np.pi*r0), 0, 1.0)
-            H = v0*Torb/(2*np.pi*r0)
-            #H = 0.0
-
-            dv_x[mask_3b] += (H/8) * (
-                -120*np.pi*mu*(cφ**2)*(sθ**3)*sφ
-                + 2*np.pi*(12*mu*sθ*sφ + sθv*(np.cos(phv)*(6*np.pi + 4*sθ*sφ) - 3*sφv))
-                + cφ * (
-                    -6*np.pi*mu*(sθ + 5*s3θ)
-                    + sθ*sθv*(128*sφv - 30*sθ*(-2*np.pi*np.cos(ph0 - phv) + np.sin(ph0 + phv)))
-                )
-            )
-
-
-            dv_y[mask_3b] += (H/4) * (
-                -3*np.pi*mu*(sθ + 5*s3θ)*sφ
-                + 4*cφ*sθ*(np.cos(phv)*sθv + 3*mu*(1 - 5*sθ**2*sφ**2))
-                + sθv * (
-                    -3*np.cos(phv)
-                    + 30*np.pi*np.cos(ph0 - phv)*sθ**2*sφ
-                    + 6*np.pi*np.sin(phv)
-                    + 68*sθ*sφ*np.sin(phv)
-                    - 15*sθ**2*sφ*np.sin(ph0 + phv)
-                )
-            )
-
-
-            dv_z[mask_3b] += (3*H*cθ/4) * (
-                -8*np.pi*mu
-                + 5 * (
-                    4*mu*sθ**2*(np.pi - cφ*sφ)
-                    + 4*sθv*np.sin(phv)
-                    - sθ*sθv*(-2*np.pi*np.cos(ph0 - phv) + np.sin(ph0 + phv))
-                )
-            )
-
-        #Hexadecapole
-        #dv_x[mask_3b] += norm2*(45/512)*(r_orb/r0)**4*(15 + 28*cos(2*th0) + 21*cos(4*th0))*xhat
-        #dv_y[mask_3b] += norm2*(45/512)*(r_orb/r0)**4*(15 + 28*cos(2*th0) + 21*cos(4*th0))*yhat
-        #dv_z[mask_3b] += norm2*(15/512)*(r_orb/r0)**4*(29 - 28*cos(2*th0) + 63*cos(4*th0))*zhat
             
 
     if (DO_CAPTURE):
@@ -450,7 +283,7 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
     vnew_x = vx + dv_x*mult
     vnew_y = vy + dv_y*mult
     vnew_z = vz + dv_z*mult
-
+    
     vnew_sq = (vnew_x)**2 + (vnew_y)**2 + (vnew_z)**2
 
     dE += 0.5*(vs**2 - vnew_sq)

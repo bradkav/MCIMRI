@@ -11,6 +11,7 @@ import binaries
 import orbits
 import utilities
 
+import gzip
 from pathlib import Path
 
 import matplotlib
@@ -31,6 +32,8 @@ parser.add_argument("-rank", type=int)
 parser.add_argument("-logm1", type=float, default = np.log10(4e6))
 parser.add_argument("-logm2", type=float, default = 4)
 parser.add_argument("-mode", type=str, default="Full")
+parser.add_argument("-IDstr", type=str, default="")
+parser.add_argument("-dN", type= int, default=1)
 
 group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument('-rS', type = float)
@@ -65,14 +68,20 @@ L_lc = 4*u.G_N*m1/u.c
 # Set up file system
 #-------------------
 
-dN = 1
+dN = args.dN
 
 dN_str = ""
 if (dN > 1):
     dN_str = f"_dN_{str(int(dN))}"
 
 
-froot = f"logM1_{np.log10(m1/u.Msun):.2f}_logM2_{np.log10(m2/u.Msun):.2f}_Sharpe1_{mode}_{rstr}{dN_str}_Oct26_Pscat_v2_NewStir"
+IDstr = args.IDstr
+if (IDstr):
+    if (IDstr[0] != "_"):
+        IDstr = "_" + IDstr
+
+froot = f"logM1_{np.log10(m1/u.Msun):.2f}_logM2_{np.log10(m2/u.Msun):.2f}_{mode}_{rstr}{dN_str}{IDstr}"
+print(froot)
 
 N_jobs = 32
 
@@ -115,7 +124,7 @@ f_ej    /= N_jobs
 f_ej_free /= N_jobs
 
 hdrtxt = "Columns: N_orbs, r_2 [pc], rho(r_2), no capture [Msun/pc**3], rho(r_2), including capture [Msun/pc**3], f_ej, f_ej_free"
-np.savetxt("../results/" + f"Density_r_{froot}_all.txt", np.column_stack((Nlist, rlist/u.pc, rho_full/(u.Msun/u.pc**3), rho_full_free/(u.Msun/u.pc**3), f_ej, f_ej_free)), header=hdrtxt)
+np.savetxt("../results/" + f"Density_r_{froot}_all.txt.gz", np.column_stack((Nlist, rlist/u.pc, rho_full/(u.Msun/u.pc**3), rho_full_free/(u.Msun/u.pc**3), f_ej, f_ej_free)), header=hdrtxt)
 
 plt.figure()
 
@@ -149,7 +158,7 @@ Etot /= N_jobs
 Etot_free /= N_jobs
 
 hdrtxt = "Columns: N_orbs, Total DM energy (no capture) [Msun (km/s)^2], Total DM energy (including capture) [Msun (km/s)^2]"
-np.savetxt("../results/" + f"Etot_{froot}_all.txt", np.column_stack((Nlist, Etot, Etot_free)), header=hdrtxt)
+np.savetxt("../results/" + f"Etot_{froot}_all.txt.gz", np.column_stack((Nlist, Etot, Etot_free)), header=hdrtxt)
 
 
 plt.figure()
@@ -184,7 +193,34 @@ if (STITCH_ETEST):
 
     hdrtxt = "Columns: N_orbs, Total energy transfer (including all processes) [Msun (km/s)^2]"
     np.savetxt("../results/" + f"Etest_{froot}_all.txt", np.column_stack((Nlist, Etest)), header=hdrtxt)
- 
+
+
+print("Stitching orbits...")
+try:
+    for ind in ["0", "-1"]:
+        with gzip.open("../results/" + f"Orbits_{froot}_Norb_{ind}.txt.gz", "wt") as fout:
+        
+            for i in range(N_jobs):
+
+                fstr = froot + "_" + str(int(i))
+                datapath = "../data/" + froot + "/" + fstr + "/"
+
+                ext = ".txt.gz"
+                fname = datapath + "Orbits_" + fstr + "_Norb_" + ind + ext
+                #print(fname)
+                
+                with gzip.open(fname, "rt") as fin:
+                    if i == 0:
+                        # Copy entire first file, including header
+                        fout.write(fin.read())
+                    else:
+                        # Skip header
+                        next(fin)
+                        for line in fin:
+                            fout.write(line)
+except:
+    print("...Failed.")
+    
 
 #------------------------------------
 if (DO_DENSITY_PROFILES == False):
@@ -242,10 +278,13 @@ while RUNNING:
 
 
         if (i == 0):
-            print(n_j)
+            if ((j+1)%10 == 0):
+                print(n_j)
+            else:
+                print(n_j,end="...")
             if (j == 0):
-                fout = "../data/" + froot + "/" + f"Density_{froot}_all_OrbitNumbers.txt"
-                print(fout)
+                fout = "../data/" + froot + "/" + f"Density_{froot}_all_OrbitNumbers.txt.gz"
+                #print(fout)
                 np.savetxt(fout, numbers_sorted)
 
             
@@ -258,7 +297,7 @@ while RUNNING:
     f_ej /= N_jobs
 
     hdrtxt = "Columns: r [pc], rho [Msun/pc**3], rho/rho_i, rho (uncaptured) [Msun/pc**3], rho/rho_i (uncaptured)"
-    np.savetxt("../data/" + froot + "/" + f"Density_{froot}_all_Norb_{str(n_j)}.txt", np.column_stack((rlist/u.pc, rho_full/(u.Msun/u.pc**3), rho_ratio, rho_full_free/(u.Msun/u.pc**3), rho_ratio_free)), header=hdrtxt)
+    np.savetxt("../data/" + froot + "/" + f"Density_{froot}_all_Norb_{str(n_j)}.txt.gz", np.column_stack((rlist/u.pc, rho_full/(u.Msun/u.pc**3), rho_ratio, rho_full_free/(u.Msun/u.pc**3), rho_ratio_free)), header=hdrtxt)
     
     j += 1
     if (j >= (N_snaps)):
@@ -303,7 +342,7 @@ plt.xscale('log')
 plt.xlabel(r'$r$ [pc]')
 plt.ylabel(r'$\rho_\mathrm{DM}(r)/\rho_i(r)$')
 
-plt.legend(loc='best', fontsize=12)
+#plt.legend(loc='best', fontsize=12)
 
 #plt.text(0.04, 0.95, plotlabel, ha='left', va='top', fontsize=12, transform=plt.gca().transAxes)
 
