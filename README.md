@@ -6,7 +6,7 @@
 
 ### Code
 
-The code requires (`NbodyIMRI`)[https://github.com/bradkav/NbodyIMRI] to be installed 
+The code requires [`NbodyIMRI`](https://github.com/bradkav/NbodyIMRI) to be installed.
 
 The relevant code is in the `src` directory:
 - `MCimri.py`. The core of the code for calculating the energy kicks of particles at each orbit of the binary
@@ -25,8 +25,8 @@ The script takes the following flags:
 - `-logm2`: The log10 of the secondary mass in Msun
 - `-rS`, `-pc`: The initial binary separation. Only one of these two flags can be set, with the first (`-rS`) being the separation in units of Schwarzschild Radii of the primary and the second (`-pc`) being the separation in pc
 - `-rank`: This is a useful flag (integer) for labelling different runs in parallel. If using only one run, this can be set to 0. 
-- `IDstr`: Identifier string which will be appended to the output files.
-- `N_particles`: Number of DM particles to be simulated in the run. 
-- `mode`: The simulation can be run with the options `Full` (which includes dynamical friction and stirring effects, the default), `NoInner` (which includes dynamical friction and stirring effects only outside the binary), or `NoStir` (which includes only dynamical friction). 
+- `-IDstr`: Identifier string which will be appended to the output files.
+- `-N_particles`: Number of DM particles to be simulated in the run. 
+- `-mode`: The simulation can be run with the options `Full` (which includes dynamical friction and stirring effects, the default), `NoInner` (which includes dynamical friction and stirring effects only outside the binary), or `NoStir` (which includes only dynamical friction). 
 
 Further internal options can be set directly in the `EvolveBinary.py` script and in the `MCimri.py` module, which contains the core of the Monte Carlo evolution of the DM spike. 
