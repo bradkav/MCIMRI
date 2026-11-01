@@ -9,7 +9,8 @@
 The code requires [`NbodyIMRI`](https://github.com/bradkav/NbodyIMRI) to be installed.
 
 The relevant code is in the `src` directory:
-- `MCimri.py`. The core of the code for calculating the energy kicks of particles at each orbit of the binary
+- `MCimri.py`. The core of the code for calculating the energy kicks of particles at each orbit of the binary.
+- `binaries.py`. Code for defining and calculating the properties of binaries (orbital periods etc).
 - `orbits.py`. Code for drawing Keplerian orbits from a given set of orbital parameters.
 - `utilities.py`. A range of tools, such as performing averages, certain vector operations, and storing output of the simulations.
 - `InspiralCalculator.py`. Code to calculate the number of orbits to merger for a given binary and initial separation.
