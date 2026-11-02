@@ -72,7 +72,7 @@ group.add_argument('-pc', type = float)
 args = parser.parse_args()
 
 rank = int(args.rank)
-print("rank:", rank)
+#print("rank:", rank)
 
 dN = args.dN
 N_particles = args.N_particles
@@ -240,7 +240,8 @@ rholist_i_free = orbits.reconstruct_density_full(rlist, Es_i, Ls_i, weights_lc, 
 #Simulate over Norb orbits and reconstruct density
 #---------------------------------------------
 N_to_merge = binary.Norb_to_merger(a_i)
-print("Number of orbits to merger:", N_to_merge)
+if (rank == 0):
+    print("Number of orbits to merger:", N_to_merge)
 
 if (Norb < 0):
     DYNAMIC_OUTSTEPS = False
@@ -293,7 +294,7 @@ for i in tqdm(range(Norb)):
         N_out = 1
             
     if (i%25_000 == 0):
-        print("Number of orbits completed:", i)
+        print("Rank", rank, "- Number of orbits completed:", i)
 
     if (i%N_out == 0):
         #print("Number of orbits, r/r_i:", i, r_orb/a_i)
@@ -367,6 +368,7 @@ for i in tqdm(range(Norb)):
         ts.save(datapath, fstr)
         
         break
+
 
 if (r_orb > r_isco):
     ts.add(i, Es, Ls, weights, weights_lc, r_orb, E_uncap)

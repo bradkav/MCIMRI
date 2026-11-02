@@ -129,8 +129,8 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
             scatter = _x < p_scat[mask_DF]
             
             #Parallel and perperdicular components of the velocity kick            
-            dv_para = 2*v_rel[mask_DF]*(1 + b_new**2/b90[mask_DF]**2)**(-1) 
-            dv_perp = -2*v_rel[mask_DF]*(b_new/b90[mask_DF])*(1 + b_new**2/b90[mask_DF]**2)**(-1) 
+            dv_para = 2*v_rel[mask_DF]*(1 + bs[mask_DF]**2/b90[mask_DF]**2)**(-1) 
+            dv_perp = -2*v_rel[mask_DF]*(bs[mask_DF]/b90[mask_DF])*(1 + bs[mask_DF]**2/b90[mask_DF]**2)**(-1) 
 
             #Apply probability to scatter
             dv_para *= scatter
