@@ -20,8 +20,9 @@ import utilities
 #################
 ##### FLAGS #####
 #################
-DO_INNER            = True
-DO_CAPTURE          = False
+DO_INNER     = True
+DO_CAPTURE   = False
+TRANSVERSE_KICKS = True
 
 def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3body=True, elements="ELLz", b_min = 0.0, b_max=None):
     
@@ -37,7 +38,9 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
     #----------------
     if (b_max is None):
         b_max = 0.3*r_orb
-    
+
+    #print(b_min/u.pc, b_max/u.pc)
+        
     r_min_stir = r_orb
     r_max_stir = r_orb
     #----------------
@@ -49,7 +52,8 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
     
     if (elements == "E"):
         Ls_a = L_circ*np.sqrt(np.random.rand(N))
-    
+        Lz_a =  Ls*(2*np.random.rand(N)-1)
+
     if (elements == "EL"):
         Lz_a =  Ls*(2*np.random.rand(N)-1)
         
@@ -98,6 +102,8 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
 
     bs0 = np.sqrt(b_x**2 + b_y**2 + b_z**2)
 
+    v_dot_r = x0*vx + y0*vy + z0*vy
+    
     b90 = u.G_N*m2/((v_rel)**2)
     bs = 1.0*bs0
     
@@ -123,15 +129,20 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
 
         mask_DF  = (b_min < bs) & (bs < b_max)
         N_DF = int(np.sum(mask_DF > 0))
-        
+
+        #print(N_DF)
         if (N_DF > 0):
             _x = np.random.rand(N_DF)
             scatter = _x < p_scat[mask_DF]
             
             #Parallel and perperdicular components of the velocity kick            
-            dv_para = 2*v_rel[mask_DF]*(1 + bs[mask_DF]**2/b90[mask_DF]**2)**(-1) 
-            dv_perp = -2*v_rel[mask_DF]*(bs[mask_DF]/b90[mask_DF])*(1 + bs[mask_DF]**2/b90[mask_DF]**2)**(-1) 
+            dv_para = 2*v_rel[mask_DF]*(1 + bs[mask_DF]**2/b90[mask_DF]**2)**(-1)
 
+            if (TRANSVERSE_KICKS):
+                dv_perp = -2*v_rel[mask_DF]*(bs[mask_DF]/b90[mask_DF])*(1 + bs[mask_DF]**2/b90[mask_DF]**2)**(-1) 
+            else:
+                dv_perp = 0.0
+            
             #Apply probability to scatter
             dv_para *= scatter
             dv_perp *= scatter        
@@ -158,17 +169,6 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
 
         #Add shift due to 3 body effects
         mask_outer = (rs > r_min_stir) & (~mask_DF)
-
-        r0 = rs[mask_outer]
-        v0 = vs[mask_outer]
-        th0 = theta0[mask_outer]
-        ph0 = phi0[mask_outer]
-
-        #norm = u.G_N*m2*Torb*r_orb**2/r0**4
-
-        xhat = sin(th0)*cos(ph0)
-        yhat = sin(th0)*sin(ph0)
-        zhat = cos(th0)
         
         #Quadrupole
         norm = u.G_N*m2*Torb*r_orb**2/r0**4

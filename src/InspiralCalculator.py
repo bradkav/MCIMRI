@@ -40,16 +40,18 @@ else:
     r = args.pc*u.pc
     
 T_i = binary.T_orb(r)
+t_merge = binary.t_merge(r)
 
 print(f"(m1, m2) = ({m1/u.Msun:.2e}, {m2/u.Msun:.2e}) Msun")
 print(f"r = {r/rS:.2e} rS = {r/binary.r_isco:.2e} r_isco = {r/u.pc:.2e} pc")
 print(f"T_orb_i = {T_i/u.s} s")
 
 #N_per_min = 26_000  #1000 particles per sim
-N_per_min  = 11_000  #2000 particles per sim
+N_per_min  = 18_000  #2000 particles per sim
 #N_per_min  = 6_000   #5000 particles per sim
 
 N = binary.Norb_to_merger(r)
 
+print(f"Time to merger [yr]: {t_merge/u.yr:.2e}")
 print(f"Number of orbits to merger: {N:.2e}")
 print(f"Simulation time required [hr]: {(N/N_per_min)/60}")

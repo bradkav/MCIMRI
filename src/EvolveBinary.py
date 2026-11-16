@@ -29,13 +29,15 @@ rho_6 = 5.45e15*u.Msun/u.pc**3
 gamma_sp = 7/3
 
 #Minimum impact parameter
+x_max = 0.3
+#b_min = 1e-9*u.pc
 b_min = 0.0
 
 x_trunc = 20 #x_trunc = r_t/a_i
 
 # Simulation Parameters
 # ---------------------
-Norb = -1 #Fix Norb = -1 for running to merger (fixed output)
+#Norb = -1 #Fix Norb = -1 for running to merger (fixed output)
 
 #Options for running to merger
 Nout_min = 10_000
@@ -56,12 +58,14 @@ SAVE_PROFILES = True
 #----------------------
 import argparse
 parser = argparse.ArgumentParser()
+parser.add_argument("-rank", type=int, default = 0)
 parser.add_argument("-logm1", type=float, default = np.log10(4e6))
 parser.add_argument("-logm2", type=float, default = 4)
 parser.add_argument("-mode", type=str, default="Full")
 parser.add_argument("-IDstr", type=str, default="")
 parser.add_argument("-dN", type=int, default = 1)
 parser.add_argument("-N_particles", type=int, default = 2000)
+parser.add_argument("-Norb", type=int, default= -1)
 
 group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument('-rS', type = float)
@@ -70,9 +74,10 @@ group.add_argument('-pc', type = float)
 
 args = parser.parse_args()
 
-
 dN = args.dN
 N_particles = args.N_particles
+rank = args.rank
+Norb = args.Norb
 
 #Flags
 #-------------------------
@@ -81,6 +86,10 @@ mode = args.mode
 INCLUDE_DF = True
 INCLUDE_3BODY = True
 EJECTING_ONLY = False
+
+if (mode == "PBH"):
+    rho_6    = 2.096865e-11*u.g/u.cm**3
+    gamma_sp = 9/4
 
 if (mode == "EjOnly"):
     EJECTING_ONLY = True
@@ -124,7 +133,7 @@ if (IDstr):
         IDstr = "_" + IDstr
 
 froot = f"logM1_{np.log10(m1/u.Msun):.2f}_logM2_{np.log10(m2/u.Msun):.2f}_{mode}_{rstr}{dN_str}{IDstr}"
-fstr = froot
+fstr = froot + "_" + str(int(rank))
 datapath = "../data/" + froot + "/" + fstr + "/"
 plotpath = "../plots/" + froot + "/" + fstr + "/"
 
@@ -180,7 +189,7 @@ def make_plot(N):
 
     m1str =  utilities.to_scientific(m1/u.Msun)
     m2str = utilities.to_scientific(m2/u.Msun)
-    plt.title(r"$(m_1, m_2) = (" + m1str + ", " + m2str + ")\,M_\odot$; " + str(int(N)) + " orbits")
+    plt.title(r"$(m_1, m_2) = (" + m1str + ", " + m2str + ") M_\\odot$; " + str(int(N)) + " orbits")
     plt.legend(loc='upper right')
 
     plt.savefig(plotpath + f"InspiralDepletion_{fstr}_Norb_{int(N)}.pdf", bbox_inches='tight')
@@ -238,7 +247,7 @@ rholist_i_free = orbits.reconstruct_density_full(rlist, Es_i, Ls_i, weights_lc, 
 #---------------------------------------------
 N_to_merge = binary.Norb_to_merger(a_i)
 
-print(IDstr, "- Number of orbits to merger:", N_to_merge)
+print("Rank", rank, "- Number of orbits to merger:", N_to_merge)
 
 if (Norb < 0):
     DYNAMIC_OUTSTEPS = False
@@ -264,7 +273,7 @@ ts = utilities.TimeSeries(binary.m1)
 save_orbits(0)
 
 for i in tqdm(range(Norb)):
-
+    
     if (DYNAMIC_OUTSTEPS):
         if (i > 20):
             N_out = 10
@@ -291,7 +300,7 @@ for i in tqdm(range(Norb)):
         N_out = 1
             
     if (i%25_000 == 0):
-        print(IDstr, "- Number of orbits completed:", i)
+        print("Rank",rank, "- Number of orbits completed:", i)
 
     if (i%N_out == 0):
         #print("Number of orbits, r/r_i:", i, r_orb/a_i)
@@ -311,12 +320,13 @@ for i in tqdm(range(Norb)):
             print(np.sum(L_out))
             
     if (i%dN == 0):
-        dE, dL, dLz = MCimri.calculate_dE(Es[inds], Ls[inds], Lz[inds], binary, r_orb, mult = dN, include_DF=INCLUDE_DF, include_3body=INCLUDE_3BODY, b_min = b_min)
+        dE, dL, dLz = MCimri.calculate_dE(Es[inds], Ls[inds], Lz[inds], binary, r_orb, mult = dN, include_DF=INCLUDE_DF, include_3body=INCLUDE_3BODY, b_min = b_min, b_max = x_max*r_orb)
 
         _dE  = np.nan_to_num(dE)
         _dL  = np.nan_to_num(dL)
         _dLz = np.nan_to_num(dLz)
 
+        #BJK
         E_uncap += np.sum(_dE*weights_lc[inds])
         
         # Work on subset
@@ -365,7 +375,7 @@ for i in tqdm(range(Norb)):
         ts.save(datapath, fstr)
         
         break
-
+    
 
 if (r_orb > r_isco):
     ts.add(i, Es, Ls, weights, weights_lc, r_orb, E_uncap)

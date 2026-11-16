@@ -34,6 +34,7 @@ parser.add_argument("-logm2", type=float, default = 4)
 parser.add_argument("-mode", type=str, default="Full")
 parser.add_argument("-IDstr", type=str, default="")
 parser.add_argument("-dN", type= int, default=1)
+parser.add_argument("-Njobs", type=int, default=32)
 
 group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument('-rS', type = float)
@@ -83,7 +84,7 @@ if (IDstr):
 froot = f"logM1_{np.log10(m1/u.Msun):.2f}_logM2_{np.log10(m2/u.Msun):.2f}_{mode}_{rstr}{dN_str}{IDstr}"
 print(froot)
 
-N_jobs = 32
+N_jobs = args.Njobs
 
 plotpath = "../plots/" + froot + "/"
 
