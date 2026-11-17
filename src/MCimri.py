@@ -154,6 +154,7 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
                     
     if (include_3body):
         
+        mask_inner = np.ones_like(rs, dtype=int)
         if (DO_INNER):
             a_DM = u.G_N*m1/(2*Es)
             
@@ -188,12 +189,21 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
         dE_theory = -sgn*(2*np.pi/Torb)*dLz_theory
         
         Ef_test = Es[mask_outer] + dE_theory[mask_outer]
+        
         Lf_circ = u.G_N*m1/(np.sqrt(2*Ef_test))
         Lf_test = ((Lx + dLx_theory)**2 + (Ly + dLy_theory)**2 + (Lz_a + dLz_theory)**2)**0.5
         
         dE[mask_outer] = dE_theory[mask_outer]
         dL[mask_outer] = np.minimum(Lf_test[mask_outer], Lf_circ) - Ls_a[mask_outer] #Truncate at L_circ
         dL_z[mask_outer] = dLz_theory[mask_outer]
+        
+        #_test = np.abs(Ls[mask_outer] + dL[mask_outer])
+        
+        #Lc_new = u.G_N*m1/np.sqrt(2*(Es[mask_outer] + dE[mask_outer]))
+        #print(np.sum(dv_x[mask_outer] + dv_y[mask_outer] + dv_z[mask_outer]))
+        #print(np.sum(np.isnan(dE[mask_outer])))
+        #print(np.sum(np.isnan(dL[mask_outer])))
+        #print(np.sum(np.isnan(dL_z[mask_outer])))
         
         #Quadrupole
         #norm = u.G_N*m2*Torb*r_orb**2/r0**4
@@ -202,6 +212,7 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
         #dv_z[mask_outer] += -norm*(3/4)*(3 - 5*np.cos(th0)**2)*zhat
             
 
+    mask_cap = np.ones_like(rs, dtype=int)
     if (DO_CAPTURE):
         b_cap = 4*u.G_N*m2/(v_rel*u.c)
         mask_cap  = (bs < b_cap)
@@ -218,17 +229,16 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
     
     vnew_sq = (vnew_x)**2 + (vnew_y)**2 + (vnew_z)**2
 
-    dE += 0.5*(vs**2 - vnew_sq)
-
     Lnew_x = +(y0*vnew_z - z0*vnew_y)
     Lnew_y = -(x0*vnew_z - z0*vnew_x)
     Lnew_z = +(x0*vnew_y - y0*vnew_x)
         
-    dL_z += Lnew_z - Lz_a
-
     Lnew = np.sqrt(Lnew_x**2 + Lnew_y**2 + Lnew_z**2)
-
-    dL += Lnew - Ls
-
+    
+    mask_velocity = mask_DF | mask_inner | mask_cap
+    dE[mask_velocity]   += 0.5*(vs[mask_velocity]**2 - vnew_sq[mask_velocity])
+    dL[mask_velocity]   += Lnew[mask_velocity] - Ls[mask_velocity]
+    dL_z[mask_velocity] += Lnew_z[mask_velocity] - Lz_a[mask_velocity]
+    
     return dE, dL, dL_z
     
