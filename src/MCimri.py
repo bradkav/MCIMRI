@@ -47,8 +47,8 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
     
     L_circ = u.G_N*m1/np.sqrt(2*Es)
     
-    Ls_a = Ls
-    Lz_a = Lz
+    Ls_a = 1.0*Ls
+    Lz_a = 1.0*Lz
     
     if (elements == "E"):
         Ls_a = L_circ*np.sqrt(np.random.rand(N))
@@ -102,7 +102,7 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
 
     bs0 = np.sqrt(b_x**2 + b_y**2 + b_z**2)
 
-    v_dot_r = x0*vx + y0*vy + z0*vy
+    v_dot_r = x0*vx + y0*vy + z0*vz
     
     b90 = u.G_N*m2/((v_rel)**2)
     bs = 1.0*bs0
@@ -170,11 +170,36 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
         #Add shift due to 3 body effects
         mask_outer = (rs > r_min_stir) & (~mask_DF)
         
+        sgn = 1 #Anti-clockwise orbit
+        norm = 3*u.G_N*m2*r_orb**2*T_orb/rs**5
+
+        Ax = -sgn*(vy*z0 + y0*vz)/4 + (vx*z0 + x0*vz)/(8*np.pi)
+        Ay =  (vx*z0 + x0*vz)/4 - sgn*(vy*z0 + y0*vz)/(8*np.pi)
+        Az = -sgn*(x0*vx - y0*vy)/(4*np.pi)
+
+        Px = -sgn*y0*z0/4 + x0*z0/(8*np.pi)
+        Py = x0*z0/4 - sgn*y0*z0/(8*np.pi)
+        Pz = -sgn*(x0**2 - y0**2)/(8*np.pi)
+
+        dLx_theory = norm*(0.5*(-y0*z0) + T_orb*(Ax - (5*v_dot_r/rs**2)*Px))
+        dLy_theory = norm*(0.5*(+x0*z0) + T_orb*(Ay - (5*v_dot_r/rs**2)*Py))
+        dLz_theory = norm*T_orb*(Az - (5*v_dot_r/rs**2)*Pz)
+
+        dE_theory = -sgn*(2*np.pi/T_orb)*dLz_theory
+        
+        Ef_test = Es[mask_outer] + dE_theory[mask_outer]
+        Lf_circ = u.G_N*m1/(np.sqrt(2*Ef_test))
+        Lf_test = ((Lx + dLx_theory)**2 + (Ly + dLy_theory)**2 + (Lz_a + dLz_theory)**2)**0.5
+        
+        dE[mask_outer] = dE_theory[mask_outer]
+        dL[mask_outer] = np.minimum(Lf_test[mask_outer], Lf_circ) - Ls_a[mask_outer] #Truncate at L_circ
+        dL_z[mask_outer] = dLz_theory[mask_outer]
+        
         #Quadrupole
-        norm = u.G_N*m2*Torb*r_orb**2/r0**4
-        dv_x[mask_outer] += -norm*(3/4)*(1 - 5*np.cos(th0)**2)*xhat
-        dv_y[mask_outer] += -norm*(3/4)*(1 - 5*np.cos(th0)**2)*yhat
-        dv_z[mask_outer] += -norm*(3/4)*(3 - 5*np.cos(th0)**2)*zhat
+        #norm = u.G_N*m2*Torb*r_orb**2/r0**4
+        #dv_x[mask_outer] += -norm*(3/4)*(1 - 5*np.cos(th0)**2)*xhat
+        #dv_y[mask_outer] += -norm*(3/4)*(1 - 5*np.cos(th0)**2)*yhat
+        #dv_z[mask_outer] += -norm*(3/4)*(3 - 5*np.cos(th0)**2)*zhat
             
 
     if (DO_CAPTURE):
@@ -198,12 +223,16 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
     Lnew_x = +(y0*vnew_z - z0*vnew_y)
     Lnew_y = -(x0*vnew_z - z0*vnew_x)
     Lnew_z = +(x0*vnew_y - y0*vnew_x)
-    
+        
     dL_z += Lnew_z - Lz_a
 
     Lnew = np.sqrt(Lnew_x**2 + Lnew_y**2 + Lnew_z**2)
 
-    dL += Lnew - Ls
+    L_circ_new = (np.G_N*m1)/np.sqrt(2*(Es + dE))
+    Lnew = np.clip(Lnew, 0, L_circ_new)
+
+    mask_velocity = mask_DF | mask_inner
+    dL[mask_velocity] += Lnew[mask_velocity] - Ls[mask_velocity]
 
         
     return dE, dL, dL_z
