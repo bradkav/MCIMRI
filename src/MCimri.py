@@ -151,10 +151,11 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
             dv_x[mask_DF] += dv_para*v_rel_x[mask_DF]/v_rel[mask_DF] + dv_perp*b_x[mask_DF]/bs[mask_DF]
             dv_y[mask_DF] += dv_para*v_rel_y[mask_DF]/v_rel[mask_DF] + dv_perp*b_y[mask_DF]/bs[mask_DF]
             dv_z[mask_DF] += dv_para*v_rel_z[mask_DF]/v_rel[mask_DF] + dv_perp*b_z[mask_DF]/bs[mask_DF]
-                    
+
+    mask_inner = np.zeros(N, dtype=bool)
+    mask_outer = np.zeros(N, dtype=bool)
     if (include_3body):
         
-        mask_inner = np.ones_like(rs, dtype=int)
         if (DO_INNER):
             a_DM = u.G_N*m1/(2*Es)
             
@@ -212,7 +213,7 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
         #dv_z[mask_outer] += -norm*(3/4)*(3 - 5*np.cos(th0)**2)*zhat
             
 
-    mask_cap = np.ones_like(rs, dtype=int)
+    mask_cap = np.zeros(N, dtype=bool)
     if (DO_CAPTURE):
         b_cap = 4*u.G_N*m2/(v_rel*u.c)
         mask_cap  = (bs < b_cap)
@@ -236,6 +237,7 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
     Lnew = np.sqrt(Lnew_x**2 + Lnew_y**2 + Lnew_z**2)
     
     mask_velocity = mask_DF | mask_inner | mask_cap
+    print(np.sum(mask_velocity))
     dE[mask_velocity]   += 0.5*(vs[mask_velocity]**2 - vnew_sq[mask_velocity])
     dL[mask_velocity]   += Lnew[mask_velocity] - Ls[mask_velocity]
     dL_z[mask_velocity] += Lnew_z[mask_velocity] - Lz_a[mask_velocity]
