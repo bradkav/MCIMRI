@@ -171,7 +171,7 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
         mask_outer = (rs > r_min_stir) & (~mask_DF)
         
         sgn = 1 #Anti-clockwise orbit
-        norm = 3*u.G_N*m2*r_orb**2*T_orb/rs**5
+        norm = 3*u.G_N*m2*r_orb**2*Torb/rs**5
 
         Ax = -sgn*(vy*z0 + y0*vz)/4 + (vx*z0 + x0*vz)/(8*np.pi)
         Ay =  (vx*z0 + x0*vz)/4 - sgn*(vy*z0 + y0*vz)/(8*np.pi)
@@ -181,11 +181,11 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
         Py = x0*z0/4 - sgn*y0*z0/(8*np.pi)
         Pz = -sgn*(x0**2 - y0**2)/(8*np.pi)
 
-        dLx_theory = norm*(0.5*(-y0*z0) + T_orb*(Ax - (5*v_dot_r/rs**2)*Px))
-        dLy_theory = norm*(0.5*(+x0*z0) + T_orb*(Ay - (5*v_dot_r/rs**2)*Py))
-        dLz_theory = norm*T_orb*(Az - (5*v_dot_r/rs**2)*Pz)
+        dLx_theory = norm*(0.5*(-y0*z0) + Torb*(Ax - (5*v_dot_r/rs**2)*Px))
+        dLy_theory = norm*(0.5*(+x0*z0) + Torb*(Ay - (5*v_dot_r/rs**2)*Py))
+        dLz_theory = norm*Torb*(Az - (5*v_dot_r/rs**2)*Pz)
 
-        dE_theory = -sgn*(2*np.pi/T_orb)*dLz_theory
+        dE_theory = -sgn*(2*np.pi/Torb)*dLz_theory
         
         Ef_test = Es[mask_outer] + dE_theory[mask_outer]
         Lf_circ = u.G_N*m1/(np.sqrt(2*Ef_test))
@@ -228,12 +228,7 @@ def calculate_dE(Es, Ls, Lz, binary, r_orb, mult = 1, include_DF=True, include_3
 
     Lnew = np.sqrt(Lnew_x**2 + Lnew_y**2 + Lnew_z**2)
 
-    L_circ_new = (np.G_N*m1)/np.sqrt(2*(Es + dE))
-    Lnew = np.clip(Lnew, 0, L_circ_new)
-
-    mask_velocity = mask_DF | mask_inner
-    dL[mask_velocity] += Lnew[mask_velocity] - Ls[mask_velocity]
-
+    dL += Lnew - Ls
         
     return dE, dL, dL_z
     
